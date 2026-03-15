@@ -1,0 +1,205 @@
+# Changelog
+
+## v0.4.0 — Multi-Tab Navigation & Performance
+
+### Multi-Tab Navigation
+- **Browser-style tabs** — open multiple views side by side using the `+` button in the tab bar
+- **Middle-click** or **Ctrl+click** any linked character, story, faction, or location to open it in a new tab
+- Works across all link surfaces: detail panels (characters, stories, factions, locations, artifacts), event char chips in Story Timeline and Global Timeline, story header rows in Global Timeline, and item holder/story links in the Items tab
+- Tabs are independent — each has its own selected entity, sub-tab, and scroll state
+
+### Performance
+- Characters, Stories, Factions, and Locations tabs extracted into dedicated `React.memo` components — only the relevant tab re-renders on state changes
+- `useMemo` for filtered character lists, story groupings, and current timeline date computation
+- Stable `useCallback` handlers throughout to minimise child re-renders
+
+---
+
+## v0.3.2 — Faction Structure, Customizable Statuses & Race Icons
+
+### Factions
+- New **🏗️ Structure** (now **👥 Members**) tab in faction detail — drag-and-drop tier builder to organize members into named rank/role levels
+- Tiers can be reordered with ▲/▼ arrows, renamed, given a description, and deleted (with confirmation)
+- Description moved to a dedicated **📖 Description** tab — cleaner layout
+- Dragging a member card between tiers updates their assignment instantly
+
+### Settings — Customizable Statuses
+- **Story Statuses** are now fully editable in Settings — add, rename, delete, and pick a color per status
+- **Hook Statuses** (🔮 Hooks tab in Stories) are also fully editable with color picker
+- Changes take effect immediately across all stories and hooks
+
+### Settings — Race Icons
+- Each race entry in Settings now supports a **custom icon image** (upload any PNG/JPG)
+- The custom icon replaces the default 🧬 emoji in character list cards and detail panels
+- Icon can be removed to revert to the default 🧬
+
+### Relations Tab
+- Removed the Relations tab (data is preserved in campaign saves)
+
+### Session Log
+- Individual log **events** now require delete confirmation before removal (inline, same style as session-level deletion)
+
+---
+
+## v0.3.1 — Polish, Navigation & QoL Improvements
+
+### Navigation & Memory
+- Each tab now remembers the last selected item — navigating away and back restores the previous selection
+- Story and Character detail panels remember the last active sub-tab (Details, Items, Timeline, etc.) across tab switches
+- Clicking a linked faction, character, story, or location no longer clears the selection in other tabs
+
+### Stories
+- New **🔮 Hooks** sub-tab — add potential future scenarios, plot branches, and quest hooks with status (Potential / Active / Resolved / Abandoned)
+- Delete confirmation popup on hooks
+
+### Factions
+- Description field now preserves line breaks (Shift+Enter)
+- Faction list card hides side characters from member preview
+- Faction detail panel separates main/player members from side characters (collapsible section)
+
+### Locations
+- Location list cards now show linked **faction chips** (colored by faction color) and hide side characters
+- Location detail panel redesigned: inline editing (no more popup window), matching the pattern of other tabs
+- Location detail panel shows linked factions as clickable chips — click to jump to that faction
+- Description field preserves line breaks (Shift+Enter)
+
+### Stories > Items & Items Tab
+- Linked artifacts in Stories are now clickable — click jumps to Items tab and selects the artifact
+- Linked artifacts show character avatar + owner name as a clickable link to Characters tab
+- Linked stories in Items tab detail panel are now clickable links to Stories
+- Item descriptions preserve line breaks (Shift+Enter)
+
+### Pinned Reminders
+- Linked character now shows avatar, name, and short description as a clickable link to Characters tab
+- Character linking converted to **multi-select** — pin multiple characters to one reminder
+- Legacy single-character pins automatically migrated
+
+### Timeline & Lore
+- Event descriptions now preserve line breaks (Shift+Enter) in Story Timeline, Global Timeline, and Character Timeline
+
+### Image Lightbox
+- All zoomable images now show **Copy to Clipboard** and **Download** buttons
+- Copy uses native Electron clipboard API (reliable, works with all image formats)
+- Toast notification confirms successful copy
+
+### External Links
+- External links in Character detail (and everywhere else) now open in the system browser instead of a new Electron window
+
+---
+
+## v0.3.0 — Map Improvements, Session Log & Navigation
+
+### World Map
+- Pin labels shown by default; toggle "Labels On/Off" button with persistent setting (saved to localStorage)
+- Hover tooltip shows pin name + remove button even when labels are off (map stays clean by default)
+- Sidebar pin list — see all pinned locations at a glance, searchable and grouped by location type
+- Click a sidebar entry to center the camera on that pin
+- "🗺️ Show on Map" button in Location detail panel banner — navigates to Map tab and centers the view on the pin
+- If a location is pinned on multiple maps, a picker modal lets you choose which map to open
+- Labels toggle state persists across sessions via localStorage
+
+### Session Log
+- New session events now appear at the top (newest first)
+- Input box moved above the event list for faster entry
+- Session log header shows total event count across all sessions
+- Clicking a linked story in a session event now navigates to that story AND scrolls to / highlights the specific timeline event
+
+### Stories & Timeline
+- Events within a story are now sorted by date on save (year → month → day)
+- Timeline events highlight and auto-scroll when navigated to from the session log
+
+### Characters
+- Empty state now shows a helpful prompt: "No characters yet. Click '+ Add' to get started."
+- Search empty state shows "No characters match your search."
+
+### Pinned Reminders
+- Up/Down reorder buttons (▲/▼) on each pinned reminder
+
+---
+
+## v0.2.0 — Campaigns, World Map & Electron
+
+### Multiple Campaigns
+- Full multi-campaign support — each campaign is a separate world stored independently
+- Campaign Manager screen (fullscreen on first launch, modal overlay when switching)
+- Create, rename, delete campaigns with confirmation popup
+- Active campaign auto-saves with 500ms debounce; synchronous flush before switching
+- Migration from legacy single-world save format
+
+### World Map Tab
+- Upload a map image (PNG, JPG, WebP) per map
+- Place location pins linked to entries from the Locations tab
+- Pin search with text filter and location type dropdown filter
+- Location type icons (emoji) shown on pins and in the search list
+- Zoom (mouse wheel, +/− buttons) and pan (drag) with counter-scaled pins
+- Multiple maps per campaign with named tabs, rename and delete (with confirmation)
+- Map data included in Export/Import
+
+### Electron
+- Removed all web-browser fallbacks (localStorage, window.storage, blob URL download, file input import)
+- Storage is now IndexedDB only; Export/Import uses native OS file dialogs exclusively
+- App renamed to **World Builder - Game Master**
+- Window title updated in electron.cjs and index.html
+
+---
+
+## v0.2 — Settings, Undo & Polish
+
+### Settings — Data Management
+- **Character Statuses** — add, rename, delete custom statuses with color picker; renames propagate to all characters
+- **Relationship Types** — same pattern: add, rename, delete with per-type color; renames propagate to all character relationships
+- Status and relationship type colors now shown in character list cards (CharCard), detail panel badges, and RelationshipLinker
+
+### Undo
+- Global undo stack (50 steps) covering: save/delete characters, stories, factions, locations, artifacts, lore events, relationship map, races, statuses, and relationship types
+- **Ctrl+Z** keyboard shortcut (skips text inputs so browser native undo still works there)
+- **↩ Undo (N)** button in sidebar showing available step count
+
+### UI
+- Version number displayed under the World Builder title in the sidebar
+
+---
+
+## v0.1 — Initial Release
+
+### Core Features
+- **Characters tab** — Main, Side, and Player character management with full detail panel
+  - Sub-tabs: Details, Items, Timeline, Files
+  - Character portrait upload with lightbox zoom
+  - Relationships, factions with roles, external links
+  - Items inventory with image lightbox and pre-wrap descriptions
+  - Character timeline (events from linked stories)
+  - Files panel for player characters
+- **Stories tab** — Story management with detail panel
+  - Main story, Player stories (compact horizontal cards), regular stories
+  - Events with character tagging and dates
+  - Status filtering and text search
+- **Factions tab** — Faction management with detail panel
+- **Locations tab** — Location management grouped by type with fold/unfold
+  - Search and type filter
+  - Detail panel showing linked characters and stories
+- **Items & Artifacts tab** — Two-column layout with rarity filtering
+  - Image lightbox, lore/history field, holder assignment, linked stories
+- **Timeline tab** — Global timeline across all stories and lore events
+- **Relations tab** — Visual relationship map
+- **Lore tab** — World lore event log
+- **Notes tab** — Scratch pad, pinned reminders, session log
+
+### Search & Filtering
+- Character search covers all fields (name, description, race, location, faction, secret, origin, class)
+- Location dropdown and Faction dropdown with inline search and flip-above logic when near screen bottom
+- Story status filter, location type filter
+
+### Layout
+- Viewport-locked layout — no page scroll, all columns scroll independently
+- Consistent two-column pattern: left list + right detail panel across all tabs
+- Back navigation between tabs (e.g. clicking a character from a story detail)
+
+### Storage & Export
+- IndexedDB as primary storage (no 5 MB browser limit)
+- Full Export/Import — saves all data including artifacts, lore, relations, and notes
+- Electron: native Save As / Open File dialogs for export/import
+
+### Electron
+- Desktop app via Electron with dev mode support
+- GitHub Actions workflow for auto-building Windows (.exe), Mac (.dmg), Linux (.AppImage) on release tag push
