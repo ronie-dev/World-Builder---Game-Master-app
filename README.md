@@ -5,7 +5,7 @@
 A desktop app for tabletop RPG Game Masters, Writers, and Video Game Creators to manage their stories, characters, factions, locations, and world maps — all in one place.
 
 Built with **Electron + React + Vite**. All data is stored locally on your machine.
-
+<img width="529" height="442" alt="Image" src="https://github.com/user-attachments/assets/9d47f62a-4db9-4f00-b116-932317ea4971" />
 ---
 
 ## What's New in v0.4.1
