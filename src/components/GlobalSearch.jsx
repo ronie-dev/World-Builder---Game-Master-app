@@ -104,6 +104,7 @@ export default function GlobalSearch({ open, onClose, chars, stories, factions, 
             style={{ flex:1, background:"none", border:"none", outline:"none", color:"#e8d5b7", fontSize:15 }}
           />
           <kbd style={{ fontSize:11, color:"#3a2a5a", background:"#1a1228", border:"1px solid #2a1f3d", borderRadius:4, padding:"2px 6px" }}>ESC</kbd>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:18, lineHeight:1, padding:"0 2px", marginLeft:4 }} onMouseEnter={e=>e.currentTarget.style.color="#e8d5b7"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✕</button>
         </div>
 
         {/* Results */}

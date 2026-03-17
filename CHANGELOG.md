@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.4.1 — QoL Improvements & Polish
+
+### Notes — Pinned Hooks
+- Story plot hooks can now be **pinned directly to Pinned Reminders** — click 📌 on any hook in the Stories → Hooks tab
+- Pinned hooks appear at the top of Pinned Reminders with the story name as a clickable link
+- Hook status can be changed directly from the Pinned Reminders list
+- Pinning and deleting pins are now **undoable** (Ctrl+Z)
+
+### Notes — Reminders
+- Completed reminders now show a **green highlight** instead of strikethrough text
+- Notes state (pins, hook pins) is now fully included in the undo history
+
+### Characters Tab
+- Player cards are now **horizontal** — smaller and more compact, showing avatar, name, class, and level in a row
+
+### Tabs — State Preserved
+- Switching tabs no longer clears in-progress form text — pinned reminders, story hooks, and other forms retain their content when you navigate away and back
+
+### Global Search
+- Added ✕ close button to the search bar so it can be closed with the mouse
+
+### Help & Shortcuts
+- New **? Help & Shortcuts** button above Undo in the sidebar
+- Lists all keyboard shortcuts and mouse gestures available in the app
+
+---
+
 ## v0.4.0 — Multi-Tab Navigation & Performance
 
 ### Multi-Tab Navigation

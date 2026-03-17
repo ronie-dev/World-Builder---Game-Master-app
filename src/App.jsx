@@ -159,7 +159,7 @@ function StoryPickerModal({ stories, onClose, onSelect }) {
   );
 }
 
-function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory }) {
+function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory, onOpenChar, onPinHook, onRemovePin, hookStatuses, onUpdateStory }) {
   const [newPin, setNewPin] = useState("");
   const [newPinCharIds, setNewPinCharIds] = useState([]);
   const [addingSession, setAddingSession] = useState(false);
@@ -195,7 +195,7 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory }) 
     setNewPinCharIds([]);
   };
 
-  const removePin = id => { setNotes(n => ({...n, pins: n.pins.filter(p=>p.id!==id)})); setConfirmDeletePinId(null); };
+  const removePin = id => { onRemovePin(id); setConfirmDeletePinId(null); };
   const movePin = (id, dir) => setNotes(n => {
     const pins = [...(n.pins||[])];
     const i = pins.findIndex(p=>p.id===id);
@@ -325,10 +325,45 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory }) 
               <button onClick={addPin} style={{ background:"#2a1f3d", border:"1px solid #3a2a5a", borderRadius:6, color:"#9a7fa0", cursor:"pointer", fontSize:13, padding:"7px 14px" }}>Pin</button>
             </div>
             <div style={{ minHeight:40 }}>
-              {(notes.pins||[]).length === 0
+              {/* Hook pins — read-only, from stories */}
+              {(notes.pins||[]).filter(p=>p.hookPin).map(p => {
+                const story = (stories||[]).find(s=>s.id===p.storyId);
+                const hook = story && (story.hooks||[]).find(h=>h.id===p.hookId);
+                if (!story || !hook) return null;
+                return (
+                  <div key={p.id} style={{ borderBottom:"1px solid #1e1630", padding:"10px 14px", background:"#0f0c1a" }}>
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ marginBottom:6, fontSize:11 }}>
+                          <span style={{ color:"#5a4a7a", textTransform:"uppercase", letterSpacing:1 }}>🔮 Plot Hook from </span>
+                          <span onClick={()=>onOpenStory(story)} style={{ color:"#c8a96e", cursor:"pointer", fontWeight:700, textDecoration:"underline" }}>{story.name}</span>
+                        </div>
+                        <div style={{ fontSize:13, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", marginBottom: hook.description ? 4 : 0 }}>{hook.title}</div>
+                        {hook.description && <div style={{ fontSize:12, color:"#b09080", lineHeight:1.5, whiteSpace:"pre-wrap", marginBottom:8 }}>{hook.description}</div>}
+                        {hookStatuses && (() => {
+                          const statuses = hookStatuses;
+                          const colorMap = Object.fromEntries(statuses.map(s=>[s.name, s.color]));
+                          const sc = colorMap[hook.status] || "#7c5cbf";
+                          return (
+                            <select
+                              value={hook.status || statuses[0]?.name || ""}
+                              onChange={e => onUpdateStory?.({...story, hooks: (story.hooks||[]).map(h => h.id===hook.id ? {...h, status: e.target.value} : h)})}
+                              style={{ fontSize:11, background:"#1a1228", border:`1px solid ${sc}66`, borderRadius:6, color:sc, padding:"3px 8px", cursor:"pointer", outline:"none" }}>
+                              {statuses.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                            </select>
+                          );
+                        })()}
+                      </div>
+                      <button onClick={()=>onPinHook(story.id, hook.id)} title="Unpin" style={{ background:"none", border:"none", color:"#c8a96e", cursor:"pointer", fontSize:14, padding:"2px 4px", flexShrink:0 }}>📌</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {(notes.pins||[]).filter(p=>!p.hookPin).length === 0 && (notes.pins||[]).filter(p=>p.hookPin).length === 0
                 ? <div style={{ color:"#3a2a5a", fontSize:13, textAlign:"center", padding:"12px 18px" }}>No reminders pinned.</div>
+                : (notes.pins||[]).filter(p=>!p.hookPin).length === 0 ? null
                 : <div style={{ display:"flex", flexDirection:"column" }}>
-                    {(notes.pins||[]).map((p, pi, arr) => {
+                    {(notes.pins||[]).filter(p=>!p.hookPin).map((p, pi, arr) => {
                       const pinChars = (p.charIds?.length ? p.charIds : p.charId ? [p.charId] : []).map(id => allChars.find(c=>c.id===id)).filter(Boolean);
                       return (
                         <div key={p.id} style={{ borderBottom:"1px solid #1e1630" }}>
@@ -357,11 +392,11 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory }) 
                               <input type="checkbox" checked={!!p.done} onChange={()=>togglePinDone(p.id)}
                                 style={{ width:15, height:15, accentColor:"#7c5cbf", cursor:"pointer", flexShrink:0, marginTop:2 }}/>
                               <div style={{ flex:1, minWidth:0 }}>
-                                <span style={{ fontSize:13, color: p.done ? "#5a4a7a" : "#e8d5b7", textDecoration: p.done ? "line-through" : "none", lineHeight:1.5, overflowWrap:"break-word", wordBreak:"break-word" }}>{p.text}</span>
+                                <span style={{ fontSize:13, color:"#e8d5b7", lineHeight:1.5, overflowWrap:"break-word", wordBreak:"break-word", ...(p.done ? { background:"#1a3a1a", borderRadius:4, padding:"1px 5px", borderLeft:"3px solid #4a9a4a" } : {}) }}>{p.text}</span>
                                 {pinChars.length > 0 && (
                                   <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:5 }}>
                                     {pinChars.map(pc => (
-                                      <div key={pc.id} onClick={() => handleOpenChar(pc)} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", width:"fit-content" }}
+                                      <div key={pc.id} onClick={() => onOpenChar?.(pc)} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", width:"fit-content" }}
                                         onMouseEnter={e => e.currentTarget.querySelector(".pin-char-name").style.color="#a07ee8"}
                                         onMouseLeave={e => e.currentTarget.querySelector(".pin-char-name").style.color="#7c5cbf"}>
                                         <Avatar src={pc.image} name={pc.name} size={20}/>
@@ -387,6 +422,7 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory }) 
           </div>
 
           {/* Scratch Pad */}
+
           <div style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden" }}>
             <div style={{ padding:"12px 18px", borderBottom:"1px solid #2a1f3d", display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>✏️ Scratch Pad</span>
@@ -888,6 +924,7 @@ export default function App() {
   const [mapPicker, setMapPicker] = useState(null); // { location, maps: [{map, pin}] }
   const [confirm, setConfirm] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [campaignManagerOpen, setCampaignManagerOpen] = useState(false);
@@ -912,7 +949,7 @@ export default function App() {
       relations: relationsRef.current, races: racesRef.current,
       charStatuses: charStatusesRef.current, relationshipTypes: relTypesRef.current,
       storyStatuses: storyStatusesRef.current, hookStatuses: hookStatusesRef.current,
-      mapData: mapDataRef.current,
+      mapData: mapDataRef.current, notes: notesRef.current,
     };
     historyRef.current = [...historyRef.current.slice(-MAX_HISTORY + 1), snap];
     setHistoryLen(historyRef.current.length);
@@ -930,6 +967,7 @@ export default function App() {
     if (snap.storyStatuses !== undefined) setStoryStatuses(snap.storyStatuses);
     if (snap.hookStatuses !== undefined) setHookStatuses(snap.hookStatuses);
     if (snap.mapData !== undefined) setMapData(snap.mapData);
+    if (snap.notes !== undefined) setNotes(snap.notes);
     showToast("Undone", "undo");
   }, [showToast]);
 
@@ -1370,6 +1408,24 @@ export default function App() {
   // All players unfiltered — for the players row in CharactersTabContent
   const allPlayers = useMemo(() => chars.filter(c => c.type==="player"), [chars]);
 
+  // Pinned hooks — toggle a story hook in notes.pins
+  const handlePinHook = useCallback((storyId, hookId) => {
+    pushHistory();
+    setNotes(n => {
+      const already = (n.pins||[]).find(p => p.hookPin && p.storyId===storyId && p.hookId===hookId);
+      if (already) return {...n, pins: n.pins.filter(p => p.id !== already.id)};
+      return {...n, pins: [{id: uid(), hookPin: true, storyId, hookId}, ...(n.pins||[])]};
+    });
+  }, [setNotes, pushHistory]);
+
+  const handleRemovePin = useCallback(id => {
+    pushHistory();
+    setNotes(n => ({...n, pins: n.pins.filter(p => p.id !== id)}));
+  }, [setNotes, pushHistory]);
+  const pinnedHookIds = useMemo(() =>
+    new Set((notes.pins||[]).filter(p=>p.hookPin).map(p=>`${p.storyId}::${p.hookId}`))
+  , [notes.pins]);
+
   // Latest timeline date across all stories — for EventModal "Insert" shortcut
   const currentTimelineDate = useMemo(() => {
     const all = stories.flatMap(s=>s.events||[]).filter(e=>e.year);
@@ -1399,7 +1455,7 @@ export default function App() {
       <div style={{ width:200, background:"#110e1c", borderRight:"1px solid #2a1f3d", display:"flex", flexDirection:"column", flexShrink:0 }}>
         <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #2a1f3d" }}>
           <div style={{ fontSize:20, fontFamily:"Georgia,serif", color:"#c8a96e", lineHeight:1.2 }}>⚗️ World<br/>Builder</div>
-          <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.4.0</div>
+          <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.4.1</div>
           <button onClick={()=>setCampaignManagerOpen(true)}
             style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"6px 9px", cursor:"pointer", textAlign:"left", transition:"border-color .15s" }}
             onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
@@ -1424,7 +1480,13 @@ export default function App() {
             </button>
           </div>
         </nav>
-        <div style={{ padding:"8px 12px", borderTop:"1px solid #2a1f3d" }}>
+        <div style={{ padding:"8px 12px", borderTop:"1px solid #2a1f3d", display:"flex", flexDirection:"column", gap:6 }}>
+          <button onClick={()=>setHelpOpen(true)} title="Keyboard shortcuts & help"
+            style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:"#9a7fa0", cursor:"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>
+            ? <span>Help & Shortcuts</span>
+          </button>
           <button onClick={undo} disabled={historyLen===0} title="Undo (Ctrl+Z)"
             style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
             onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
@@ -1471,7 +1533,7 @@ export default function App() {
             </button>
           </div>
         )}
-        {tab==="characters"&&(
+        <div style={{ display: tab==="characters" ? "contents" : "none" }}>
           <CharactersTabContent
             chars={chars} races={races} factions={factions} locations={locations}
             stories={stories} loreEvents={loreEvents} artifacts={artifacts}
@@ -1485,8 +1547,8 @@ export default function App() {
             onNewChar={openCharModal} onDeleteChar={deleteChar}
             onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction} onOpenChar={handleOpenChar}
             onSaveChar={saveChar} onUpdateArtifacts={updateArtifacts}/>
-        )}
-        {tab==="stories"&&(
+        </div>
+        <div style={{ display: tab==="stories" ? "contents" : "none" }}>
           <StoriesTabContent
             stories={stories} chars={chars} factions={factions} locations={locations} artifacts={artifacts}
             storyStatuses={storyStatuses} hookStatuses={hookStatuses}
@@ -1500,24 +1562,25 @@ export default function App() {
             onSetMain={setMainStory} onSetPlayerStory={setPlayerStory} onUpdateStory={updateStory}
             onOpenChar={handleOpenChar} onOpenFaction={handleOpenFaction} onOpenLocation={handleOpenLocation}
             onOpenArtifact={handleOpenArtifactInStory} onUpdateArtifacts={updateArtifacts}
-            onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}/>
-        )}
-        {tab==="factions"&&(
+            onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}
+            onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds}/>
+        </div>
+        <div style={{ display: tab==="factions" ? "contents" : "none" }}>
           <FactionsTabContent
             factions={factions} chars={chars}
             selectedFaction={selectedFaction} selectedFactionId={pg.selectedFactionId}
             updPg={updPg}
             onNewFaction={openFactionModal}
             onSaveFaction={saveFaction} onDeleteFaction={deleteFaction} onOpenChar={handleOpenChar}/>
-        )}
-        {tab==="timeline"&&(
+        </div>
+        <div style={{ display: tab==="timeline" ? "contents" : "none" }}>
           <div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}>
             <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 6px", fontSize:26 }}>Timeline</h1>
             <p style={{ color:"#5a4a7a", fontSize:13, margin:"0 0 24px" }}>All events across every story, grouped by date.</p>
             <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar}/>
           </div>
-        )}
-        {tab==="locations"&&(
+        </div>
+        <div style={{ display: tab==="locations" ? "contents" : "none" }}>
           <LocationsTabContent
             locations={locations} chars={chars} factions={factions} stories={stories} mapData={mapData}
             locationQuery={locationQuery} locationTypeFilter={locationTypeFilter} collapsedLocTypes={collapsedLocTypes}
@@ -1527,13 +1590,67 @@ export default function App() {
             onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
             onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction}
             onShowOnMap={handleShowOnMap}/>
-        )}
-{tab==="items"&&<ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={itemNavId}/>}
-        {tab==="map"&&<MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={mapNavTarget}/>}
-        {tab==="lore"&&<div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}/></div>}
-        {tab==="notes"&&<div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTab notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} onOpenStory={handleOpenStory}/></div>}
-        {tab==="settings"&&<div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} setChars={updateCharsFromSettings}/></div>}
+        </div>
+        <div style={{ display: tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={itemNavId}/></div>
+        <div style={{ display: tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={mapNavTarget}/></div>
+        <div style={{ display: tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}/></div></div>
+        <div style={{ display: tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTab notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} onUpdateStory={updateStory}/></div></div>
+        <div style={{ display: tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} setChars={updateCharsFromSettings}/></div></div>
       </div>
+
+      {helpOpen && (
+        <div onClick={()=>setHelpOpen(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:"#1a1228", border:"1px solid #7c5cbf", borderRadius:14, padding:"28px 32px", width:520, maxHeight:"80vh", overflowY:"auto", boxShadow:"0 0 40px #7c5cbf44" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <h2 style={{ color:"#c8a96e", fontFamily:"Georgia,serif", margin:0, fontSize:20 }}>⚗️ Help & Shortcuts</h2>
+              <button onClick={()=>setHelpOpen(false)} style={{ background:"none", border:"none", color:"#9a7fa0", cursor:"pointer", fontSize:20, lineHeight:1 }}>✕</button>
+            </div>
+            {[
+              { section: "Navigation", items: [
+                ["Ctrl + K", "Open global search"],
+                ["Ctrl + N", "Create new entry (current tab)"],
+                ["Ctrl + Z", "Undo last action"],
+                ["Ctrl + Click (sidebar)", "Open tab in new window/tab"],
+              ]},
+              { section: "Links & Badges", items: [
+                ["Middle Mouse Button", "Open linked entry in a new tab"],
+                ["Ctrl + Click (link/badge)", "Open linked entry in a new tab"],
+              ]},
+              { section: "Tabs", items: [
+                ["Click tab in sidebar", "Navigate to tab"],
+                ["Ctrl + Click (sidebar tab)", "Open tab in a new browser tab"],
+              ]},
+              { section: "Reminders (Notes tab)", items: [
+                ["Enter", "Pin a reminder"],
+                ["Shift + Enter", "New line in reminder input"],
+                ["Escape", "Cancel editing"],
+              ]},
+              { section: "Session Log (Notes tab)", items: [
+                ["Enter", "Add session event"],
+              ]},
+              { section: "Map", items: [
+                ["Scroll wheel", "Zoom in / out"],
+                ["Click + Drag", "Pan the map"],
+                ["Click pin", "Open linked location"],
+              ]},
+              { section: "Modals & Inputs", items: [
+                ["Escape", "Close modal / cancel edit"],
+                ["Enter (in list inputs)", "Add item to list"],
+              ]},
+            ].map(({ section, items }) => (
+              <div key={section} style={{ marginBottom:18 }}>
+                <div style={{ fontSize:11, color:"#7c5cbf", textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>{section}</div>
+                {items.map(([key, desc]) => (
+                  <div key={key} style={{ display:"flex", alignItems:"center", gap:12, marginBottom:6 }}>
+                    <span style={{ background:"#0f0c1a", border:"1px solid #3a2a5a", borderRadius:6, padding:"3px 10px", fontSize:12, color:"#e8d5b7", fontFamily:"monospace", flexShrink:0, minWidth:180, textAlign:"center" }}>{key}</span>
+                    <span style={{ fontSize:13, color:"#9a7fa0" }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {mapPicker && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}>

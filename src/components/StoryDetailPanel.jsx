@@ -12,7 +12,7 @@ import Timeline from "./Timeline.jsx";
 import EventModal from "./EventModal.jsx";
 
 // ── Story Hooks Tab ────────────────────────────────────────────────────────────
-function HooksTab({ story, onUpdateStory, hookStatuses }) {
+function HooksTab({ story, onUpdateStory, hookStatuses, onPinHook, pinnedHookIds }) {
   const statuses = hookStatuses || DEFAULT_HOOK_STATUSES;
   const colorMap = Object.fromEntries(statuses.map(s => [s.name, s.color]));
   const defaultStatus = statuses[0]?.name || "Potential";
@@ -96,6 +96,11 @@ function HooksTab({ story, onUpdateStory, hookStatuses }) {
                         <span style={{ fontSize:10, color:sc, background:sc+"22", border:`1px solid ${sc}44`, borderRadius:8, padding:"2px 8px", flexShrink:0, marginTop:2 }}>{h.status}</span>
                         <span style={{ fontSize:14, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", flex:1 }}>{h.title}</span>
                         <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                          {onPinHook && (() => { const isPinned = pinnedHookIds?.has(`${story.id}::${h.id}`); return (
+                            <button onClick={() => onPinHook(story.id, h.id)} style={{...btnSecondary, fontSize:12, padding:"4px 10px", display:"flex", alignItems:"center", gap:4, color: isPinned ? "#c8a96e" : "#9a7fa0", borderColor: isPinned ? "#c8a96e66" : undefined}}>
+                              📌 <span>{isPinned ? "Pinned" : "Pin to reminders"}</span>
+                            </button>
+                          ); })()}
                           <button onClick={() => { setEditingId(h.id); setEditForm({title:h.title, description:h.description||"", status:h.status||"Potential"}); }} style={{...btnSecondary, fontSize:12, padding:"4px 10px"}}>✏️</button>
                           <button onClick={() => setConfirmDeleteId(h.id)} style={{...btnSecondary, fontSize:12, padding:"4px 10px", color:"#c06060", borderColor:"#6b1a1a"}}>🗑️</button>
                         </div>
@@ -245,7 +250,7 @@ function LootTab({ story, onUpdateStory, artifacts, onUpdateArtifacts, chars, on
   );
 }
 
-function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses }) {
+function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds }) {
   const storyStatusList = storyStatuses || DEFAULT_STORY_STATUSES;
   const storyColorMap = Object.fromEntries(storyStatusList.map(s => [s.name, s.color]));
   const [eventModal, setEventModal] = useState(null);
@@ -447,7 +452,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
             <LootTab story={story} onUpdateStory={onUpdateStory} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} chars={chars} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact}/>
           )}
           {subTab==="hooks"&&(
-            <HooksTab story={story} onUpdateStory={onUpdateStory} hookStatuses={hookStatuses}/>
+            <HooksTab story={story} onUpdateStory={onUpdateStory} hookStatuses={hookStatuses} onPinHook={onPinHook} pinnedHookIds={pinnedHookIds}/>
           )}
           {subTab==="timeline"&&(
             <div style={{ padding:"16px 24px" }}>

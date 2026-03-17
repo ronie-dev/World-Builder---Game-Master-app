@@ -8,16 +8,19 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 
 ---
 
-## What's New in v0.4.0
+## What's New in v0.4.1
 
-### Multi-Tab Navigation
-- Open any character, story, faction, or location in a **new tab** — **middle-click** or **Ctrl+click** any link or badge throughout the app
-- Tabs remember their full navigation state independently (selected entity, sub-tab, filters)
-- Works on: character relationships, story/faction/location badges in detail panels, timeline entries, artifact links, and more
+### Notes — Pinned Hooks
+- Pin any story plot hook directly to Pinned Reminders with one click
+- Pinned hooks show the story name as a clickable link and let you change hook status inline
+- Pinning and deletions are fully undoable (Ctrl+Z)
 
-### Performance
-- Tab sections (Characters, Stories, Factions, Locations) are now isolated — switching tabs no longer re-renders unrelated parts of the app
-- Filtered character lists and timeline date calculations are memoized
+### QoL & Polish
+- Completed reminders now show a green highlight instead of strikethrough
+- Player cards in the Characters tab are now compact horizontal rows
+- Switching tabs no longer clears in-progress form text
+- Global search now has a ✕ close button
+- New **? Help & Shortcuts** panel in the sidebar listing all keyboard shortcuts and mouse gestures
 
 ---
 
