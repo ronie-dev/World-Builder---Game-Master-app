@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.2.1 — Character Details, Gallery & QoL Improvements
+## v0.4.3 — Character Details, Gallery & QoL Improvements
 
 ### Characters — Header Redesign
 - **Race** and **Location** now displayed in the character detail header (next to each other), removed from the Details grid

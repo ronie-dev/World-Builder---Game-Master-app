@@ -1641,7 +1641,7 @@ export default function App() {
       <div style={{ width:200, background:"#110e1c", borderRight:"1px solid #2a1f3d", display:"flex", flexDirection:"column", flexShrink:0 }}>
         <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #2a1f3d" }}>
           <div style={{ fontSize:20, fontFamily:"Georgia,serif", color:"#c8a96e", lineHeight:1.2 }}>⚗️ World<br/>Builder</div>
-          <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.4.2.1</div>
+          <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.4.3</div>
           <button onClick={()=>setCampaignManagerOpen(true)}
             style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"6px 9px", cursor:"pointer", textAlign:"left", transition:"border-color .15s" }}
             onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
