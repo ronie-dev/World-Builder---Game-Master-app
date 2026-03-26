@@ -149,19 +149,18 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar }) {
   );
 }
 
-function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelete, onOpenChar }) {
-  const [isEditing, setIsEditing] = useState(false);
+function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelete, onOpenChar, onCancelNew, isEditing, onSetEditing }) {
   const [editForm, setEditForm] = useState({ ...defaultFaction, ...faction });
   const [detailTab, setDetailTab] = useState("members");
   const colorRef = useRef();
 
-  useEffect(() => { setIsEditing(false); setEditForm({ ...defaultFaction, ...faction }); }, [faction?.id]);
+  useEffect(() => { setEditForm({ ...defaultFaction, ...faction }); }, [faction?.id]); // eslint-disable-line
 
   if (!faction) return null;
 
   const set = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
-  const handleSave = () => { onSave(editForm); setIsEditing(false); };
-  const handleCancelEdit = () => { setIsEditing(false); setEditForm({ ...defaultFaction, ...faction }); };
+  const handleSave = () => { const {_isNew, ...clean} = {...faction, ...editForm}; onSave(clean); onSetEditing(false); };
+  const handleCancelEdit = () => { if (faction._isNew) { onCancelNew?.(faction.id); return; } onSetEditing(false); setEditForm({ ...defaultFaction, ...faction }); };
 
   const allMembers = chars.filter(c => (c.factions || []).some(e => e.factionId === faction.id));
   const color = getFactionColor(factions, faction.id);
@@ -187,15 +186,15 @@ function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelet
           {isEditing ? (
             <>
               <button onClick={handleSave} disabled={!editForm.name.trim()} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>💾 Save</button>
-              <button onClick={handleCancelEdit} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px" }}>Cancel</button>
+              <button onClick={handleCancelEdit} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px" }}>{faction._isNew ? "Discard" : "Cancel"}</button>
             </>
           ) : (
             <>
-              <button onClick={() => setIsEditing(true)} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>✏️ Edit</button>
+              <button onClick={() => onSetEditing(true)} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>✏️ Edit</button>
               {onDelete && <button onClick={() => onDelete(faction.id)} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px", color:"#c06060", borderColor:"#6b1a1a" }}>🗑️ Delete</button>}
+              <button onClick={onClose} style={{ ...btnSecondary, fontSize:18, padding:"2px 10px", lineHeight:1 }}>×</button>
             </>
           )}
-          <button onClick={onClose} style={{ ...btnSecondary, fontSize:18, padding:"2px 10px", lineHeight:1 }}>×</button>
         </div>
       </div>
 
@@ -242,7 +241,7 @@ function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelet
           </div>
           <div style={{ display:"flex", gap:10 }}>
             <button onClick={handleSave} disabled={!editForm.name.trim()} style={{ ...btnPrimary, flex:1 }}>💾 Save Faction</button>
-            <button onClick={handleCancelEdit} style={{ ...btnSecondary, flex:1 }}>Cancel</button>
+            <button onClick={handleCancelEdit} style={{ ...btnSecondary, flex:1 }}>{faction._isNew ? "Discard" : "Cancel"}</button>
           </div>
         </div>
       ) : (

@@ -8,7 +8,7 @@ export default function SearchBar({ query, setQuery, filters, setFilters, chars,
       <label style={{ display:"block", fontSize:11, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>{label}</label>
       <select value={filters[key]} onChange={e=>setFilters(f=>({...f,[key]:e.target.value}))} style={{...selStyle,fontSize:13}}>
         <option value="">All</option>
-        {opts.map(o=><option key={o.value||o} value={o.value||o}>{o.label||o}</option>)}
+        {opts.map(o=><option key={o.value??o} value={o.value??o}>{typeof o==="object"?o.label:o}</option>)}
       </select>
     </div>
   );

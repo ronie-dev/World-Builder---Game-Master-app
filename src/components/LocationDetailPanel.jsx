@@ -5,18 +5,17 @@ import Avatar from "./Avatar.jsx";
 import Badge from "./Badge.jsx";
 import LinkBadge from "./LinkBadge.jsx";
 
-function LocationDetailPanel({ location, chars, factions, stories, onClose, onSave, onDelete, onOpenChar, onOpenStory, onOpenFaction, onShowOnMap }) {
-  const [isEditing, setIsEditing] = useState(false);
+function LocationDetailPanel({ location, chars, factions, stories, onClose, onSave, onDelete, onOpenChar, onOpenStory, onOpenFaction, onShowOnMap, isEditing, onSetEditing }) {
   const [editForm, setEditForm] = useState({ ...defaultLocation, ...location });
   const [sideOpen, setSideOpen] = useState(false);
 
-  useEffect(() => { setIsEditing(false); setEditForm({ ...defaultLocation, ...location }); }, [location?.id]);
+  useEffect(() => { setEditForm({ ...defaultLocation, ...location }); }, [location?.id]); // eslint-disable-line
 
   if (!location) return null;
 
   const set = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
-  const handleSave = () => { onSave(editForm); setIsEditing(false); };
-  const handleCancelEdit = () => { setIsEditing(false); setEditForm({ ...defaultLocation, ...location }); };
+  const handleSave = () => { onSave({...location, ...editForm}); onSetEditing(false); };
+  const handleCancelEdit = () => { onSetEditing(false); setEditForm({ ...defaultLocation, ...location }); };
 
   const residents = chars.filter(c => c.locationId === location.id);
   const mainResidents = residents.filter(c => c.type === "main" || c.type === "player");
@@ -63,7 +62,7 @@ function LocationDetailPanel({ location, chars, factions, stories, onClose, onSa
           ) : (
             <>
               {onShowOnMap && <button onClick={onShowOnMap} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px" }}>🗺️ Map</button>}
-              <button onClick={() => setIsEditing(true)} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>✏️ Edit</button>
+              <button onClick={() => onSetEditing(true)} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>✏️ Edit</button>
               {onDelete && <button onClick={() => onDelete(location.id)} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px", color:"#c06060", borderColor:"#6b1a1a" }}>🗑️ Delete</button>}
             </>
           )}

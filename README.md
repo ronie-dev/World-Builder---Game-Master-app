@@ -10,15 +10,35 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 
 ## What's New in v0.4.1
 
-### Notes — Pinned Hooks
+### Characters — Inline Creation
+- New characters are created directly in the detail panel — no popup modal
+- Click **+ Main** or **+ Side** to open a draft character instantly; cancel discards it without saving
+
+### Characters — Biography Tabs
+- The Biography field is now a **tabbed text editor** — add as many custom tabs as you need
+- Rename any tab by clicking ✏️, delete with ✕ (with inline confirmation)
+
+### Characters — Hooks
+- New **🔮 Hooks** sub-tab on every character — same structure as Story hooks
+- Add potential plot threads, reminders, or GM notes tied to a specific character
+- Pin character hooks to **Pinned Reminders** — they appear with the character's avatar and a clickable link
+
+### Notes — Character Hook Pins
+- Pinned character hooks show the character portrait, character name as a link, and inline status dropdown
+- Character links in Pinned Reminders are displayed as compact **horizontal pills** (avatar + name)
+
+### Notes — Pinned Story Hooks
 - Pin any story plot hook directly to Pinned Reminders with one click
 - Pinned hooks show the story name as a clickable link and let you change hook status inline
 - Pinning and deletions are fully undoable (Ctrl+Z)
 
+### Bug Fixes
+- Editing a story, character, faction, or location no longer removes hooks or other data saved after the form was opened
+- Switching tabs preserves in-progress form text
+
 ### QoL & Polish
 - Completed reminders now show a green highlight instead of strikethrough
 - Player cards in the Characters tab are now compact horizontal rows
-- Switching tabs no longer clears in-progress form text
 - Global search now has a ✕ close button
 - New **? Help & Shortcuts** panel in the sidebar listing all keyboard shortcuts and mouse gestures
 
@@ -33,8 +53,11 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 
 ### Characters
 - Main, Side, and Player character types with helpful empty-state prompts
+- Inline creation — new characters open directly in the detail panel, no popup
 - Character portrait upload with lightbox zoom
 - Details: race/subrace, class, level, alignment, origin, location, status
+- Biography with custom **tabbed text editor** — add, rename, and delete tabs
+- **🔮 Hooks** sub-tab — plot threads and GM notes per character, pinnable to Reminders
 - Relationships with other characters (typed, colored)
 - Faction memberships with roles
 - Items inventory with images and descriptions

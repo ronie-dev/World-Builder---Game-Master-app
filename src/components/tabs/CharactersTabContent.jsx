@@ -13,9 +13,11 @@ function CharactersTabContent({
   selectedChar, selectedCharId,
   charSubTab, mainCollapsed, sideCollapsed,
   updPg,
-  onNewChar, onDeleteChar,
+  onNewChar, onDeleteChar, onCancelNew,
   onOpenStory, onOpenFaction, onOpenChar,
   onSaveChar, onUpdateArtifacts,
+  onPinCharHook, pinnedCharHookIds,
+  isEditing, onSetEditing,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -28,7 +30,7 @@ function CharactersTabContent({
               title="🎲 Players" chars={allPlayers} races={races} factions={factions} locations={locations}
               onAdd={()=>onNewChar("player")} query=""
               selectedId={selectedChar?.id}
-              onSelect={c=>updPg({ selectedCharId: selectedCharId===c.id?null:c.id })}
+              onSelect={c=>updPg({ selectedCharId: selectedCharId===c.id?null:c.id, charEditing: false })}
               horizontal charStatuses={charStatuses}/>
           </div>
           <div style={{ height:1, background:"#2a1f3d", marginBottom:20 }}/>
@@ -55,7 +57,7 @@ function CharactersTabContent({
                 {!mainCollapsed && main.map(c=>(
                   <CharCard key={c.id} char={c} races={races} factions={factions} locations={locations}
                     query={query} isSelected={selectedChar?.id===c.id}
-                    onSelect={c=>updPg({ selectedCharId: selectedCharId===c.id?null:c.id })}
+                    onSelect={c=>updPg({ selectedCharId: selectedCharId===c.id?null:c.id, charEditing: false })}
                     charStatuses={charStatuses}/>
                 ))}
                 <div onClick={()=>updPg({ sideCollapsed: !sideCollapsed })} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", cursor:"pointer", userSelect:"none" }}>
@@ -67,7 +69,7 @@ function CharactersTabContent({
                 {!sideCollapsed && side.map(c=>(
                   <CharCard key={c.id} char={c} races={races} factions={factions} locations={locations}
                     query={query} isSelected={selectedChar?.id===c.id}
-                    onSelect={c=>updPg({ selectedCharId: selectedCharId===c.id?null:c.id })}
+                    onSelect={c=>updPg({ selectedCharId: selectedCharId===c.id?null:c.id, charEditing: false })}
                     charStatuses={charStatuses}/>
                 ))}
               </div>}
@@ -80,11 +82,13 @@ function CharactersTabContent({
                 charStatuses={charStatuses} storyStatuses={storyStatuses}
                 hookStatuses={hookStatuses} relationshipTypes={relationshipTypes}
                 onClose={()=>updPg({ selectedCharId: null })}
-                onDelete={onDeleteChar} onOpenStory={onOpenStory}
+                onDelete={onDeleteChar} onCancelNew={onCancelNew} onOpenStory={onOpenStory}
                 onOpenFaction={onOpenFaction} onOpenChar={onOpenChar}
                 onUpdateChar={onSaveChar} artifacts={artifacts}
                 onUpdateArtifacts={onUpdateArtifacts}
-                subTab={charSubTab} onSubTabChange={v=>updPg({ charSubTab: v })}/>
+                onPinCharHook={onPinCharHook} pinnedCharHookIds={pinnedCharHookIds}
+                subTab={charSubTab} onSubTabChange={v=>updPg({ charSubTab: v })}
+                isEditing={isEditing} onSetEditing={onSetEditing}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>👤</div>
                 <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a character to view details</div>

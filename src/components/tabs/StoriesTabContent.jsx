@@ -45,10 +45,11 @@ function StoriesTabContent({
   mainStory, playerStories, otherStories,
   currentTimelineDate,
   updPg,
-  onNewStory, onDeleteStory, onSetMain, onSetPlayerStory, onUpdateStory,
+  onNewStory, onDeleteStory, onCancelNew, onSetMain, onSetPlayerStory, onUpdateStory,
   onOpenChar, onOpenFaction, onOpenLocation, onOpenArtifact, onUpdateArtifacts,
   onAskConfirm, onCloseConfirm,
   onPinHook, pinnedHookIds,
+  isEditing, onSetEditing,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -72,7 +73,7 @@ function StoriesTabContent({
           <div style={{ marginBottom:24 }}>
             <h2 style={{ color:"#c8a96e", fontFamily:"Georgia,serif", margin:"0 0 12px", fontSize:17 }}>⭐ Main Story</h2>
             {mainStory
-              ? <StoryCard story={mainStory} chars={chars} isSelected={selectedStory?.id===mainStory.id} onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id })}/>
+              ? <StoryCard story={mainStory} chars={chars} isSelected={selectedStory?.id===mainStory.id} onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}/>
               : <div style={{ textAlign:"center", padding:"20px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:8, fontSize:13 }}>No main story set.<br/><span style={{ fontSize:12 }}>Select a story and click "☆ Set Main".</span></div>}
           </div>
           {playerStories.length>0&&(
@@ -85,7 +86,7 @@ function StoriesTabContent({
                     playerStories.filter(s=>s.playerId===player.id).map(s=>{
                       const sel=selectedStory?.id===s.id;
                       return (
-                        <div key={s.id} onClick={()=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id })}
+                        <div key={s.id} onClick={()=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}
                           style={{ display:"flex", alignItems:"flex-start", gap:10, background:sel?"#1e1535":"#1a1228", border:`1px solid ${sel?"#7c5cbf":"#3a2a5a"}`, borderRadius:10, padding:"10px 14px", cursor:"pointer", transition:"border-color .15s, background .15s", flex:"1 1 220px", minWidth:0, userSelect:"none" }}
                           onMouseEnter={e=>{ if(!sel) e.currentTarget.style.borderColor="#5a3da0"; }}
                           onMouseLeave={e=>{ if(!sel) e.currentTarget.style.borderColor="#3a2a5a"; }}>
@@ -116,7 +117,7 @@ function StoriesTabContent({
                 : <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                     {otherStories.map(s=>(
                       <StoryCard key={s.id} story={s} chars={chars} isSelected={selectedStory?.id===s.id}
-                        onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id })}/>
+                        onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}/>
                     ))}
                   </div>}
           </div>
@@ -135,7 +136,9 @@ function StoriesTabContent({
                 subTab={storySubTab} onSubTabChange={v=>updPg({ storySubTab: v })}
                 storyStatuses={storyStatuses} hookStatuses={hookStatuses}
                 currentTimelineDate={currentTimelineDate}
-                onPinHook={onPinHook} pinnedHookIds={pinnedHookIds}/>
+                onPinHook={onPinHook} pinnedHookIds={pinnedHookIds}
+                isEditing={isEditing} onSetEditing={onSetEditing}
+                onCancelNew={onCancelNew}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📜</div>
                 <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a story to view details</div>

@@ -38,7 +38,8 @@ function FactionsTabContent({
   factions, chars,
   selectedFaction, selectedFactionId,
   updPg,
-  onNewFaction, onSaveFaction, onDeleteFaction, onOpenChar,
+  onNewFaction, onCancelNew, onSaveFaction, onDeleteFaction, onOpenChar,
+  isEditing, onSetEditing,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -53,7 +54,8 @@ function FactionsTabContent({
             : <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                 {factions.map(f=>(
                   <FactionCard key={f.id} faction={f} chars={chars} isSelected={selectedFaction?.id===f.id}
-                    onSelect={f=>updPg({ selectedFactionId: selectedFactionId===f.id?null:f.id })}/>
+                    onSelect={f=>updPg({ selectedFactionId: selectedFactionId===f.id?null:f.id, factionEditing: false })}/>
+
                 ))}
               </div>}
         </div>
@@ -61,7 +63,9 @@ function FactionsTabContent({
           {selectedFaction
             ? <FactionDetailPanel faction={selectedFaction} factions={factions} chars={chars}
                 onClose={()=>updPg({ selectedFactionId: null })} onSave={onSaveFaction}
-                onDelete={onDeleteFaction} onOpenChar={onOpenChar}/>
+                onDelete={onDeleteFaction} onOpenChar={onOpenChar}
+                onCancelNew={onCancelNew}
+                isEditing={isEditing} onSetEditing={onSetEditing}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>⚑</div>
                 <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a faction to view details</div>

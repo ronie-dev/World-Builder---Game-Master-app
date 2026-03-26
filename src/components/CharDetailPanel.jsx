@@ -9,6 +9,116 @@ import FilesPanel from "./FilesPanel.jsx";
 import RelationshipLinker from "./RelationshipLinker.jsx";
 import Lightbox from "./Lightbox.jsx";
 
+// ── Char Hooks Tab ─────────────────────────────────────────────────────────────
+const DEFAULT_HOOK_STATUSES = [
+  { name:"Potential", color:"#7c5cbf" },
+  { name:"Active", color:"#4a9a6a" },
+  { name:"Resolved", color:"#9a7fa0" },
+  { name:"Abandoned", color:"#6a4a4a" },
+];
+
+function CharHooksTab({ char, onUpdateChar, hookStatuses, onPinHook, pinnedHookIds }) {
+  const statuses = hookStatuses || DEFAULT_HOOK_STATUSES;
+  const colorMap = Object.fromEntries(statuses.map(s => [s.name, s.color]));
+  const defaultStatus = statuses[0]?.name || "Potential";
+  const [addingNew, setAddingNew] = useState(false);
+  const [newForm, setNewForm] = useState({ title:"", description:"", status:defaultStatus });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const hooks = char.hooks || [];
+
+  const saveNew = () => {
+    if (!newForm.title.trim()) return;
+    onUpdateChar({ ...char, hooks: [...hooks, { ...newForm, id: uid() }] });
+    setNewForm({ title:"", description:"", status: defaultStatus });
+    setAddingNew(false);
+  };
+  const saveEdit = () => {
+    onUpdateChar({ ...char, hooks: hooks.map(h => h.id === editingId ? { ...h, ...editForm } : h) });
+    setEditingId(null);
+  };
+  const removeHook = id => onUpdateChar({ ...char, hooks: hooks.filter(h => h.id !== id) });
+
+  return (
+    <div style={{ padding:"16px 24px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase" }}>🔮 Character Hooks & Story Threads</div>
+        {!addingNew && <button onClick={() => setAddingNew(true)} style={{...btnPrimary, fontSize:12, padding:"6px 14px"}}>+ Add Hook</button>}
+      </div>
+
+      {addingNew && (
+        <div style={{ background:"#0f0c1a", border:"1px solid #7c5cbf", borderRadius:10, padding:16, marginBottom:14 }}>
+          <input value={newForm.title} onChange={e => setNewForm(f => ({...f, title:e.target.value}))} placeholder="Hook title…" style={{...inputStyle, marginBottom:8}}/>
+          <textarea value={newForm.description} onChange={e => setNewForm(f => ({...f, description:e.target.value}))} placeholder="Potential story thread, character goal, secret agenda…" rows={4} style={{...inputStyle, resize:"vertical", marginBottom:8}}/>
+          <select value={newForm.status} onChange={e => setNewForm(f => ({...f, status:e.target.value}))} style={{...selStyle, marginBottom:12}}>
+            {statuses.map(s => <option key={s.name}>{s.name}</option>)}
+          </select>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={saveNew} disabled={!newForm.title.trim()} style={{...btnPrimary, flex:1, fontSize:12}}>Add Hook</button>
+            <button onClick={() => { setAddingNew(false); setNewForm({title:"",description:"",status:defaultStatus}); }} style={{...btnSecondary, flex:1, fontSize:12}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {hooks.length === 0 && !addingNew && (
+        <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a" }}>
+          <div style={{ fontSize:36, marginBottom:10 }}>🔮</div>
+          <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>No hooks yet.</div>
+          <div style={{ fontSize:12, marginTop:6 }}>Add story threads, character goals, or secret agendas.</div>
+        </div>
+      )}
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {hooks.map(h => {
+          const sc = colorMap[h.status] || "#7c5cbf";
+          return (
+            <div key={h.id} style={{ background:"#0f0c1a", border:"1px solid #2a1f3d", borderLeft:`3px solid ${sc}`, borderRadius:10, padding:14 }}>
+              {editingId === h.id ? (
+                <>
+                  <input value={editForm.title} onChange={e => setEditForm(f => ({...f, title:e.target.value}))} style={{...inputStyle, marginBottom:8}}/>
+                  <textarea value={editForm.description||""} onChange={e => setEditForm(f => ({...f, description:e.target.value}))} rows={4} style={{...inputStyle, resize:"vertical", marginBottom:8}}/>
+                  <select value={editForm.status||defaultStatus} onChange={e => setEditForm(f => ({...f, status:e.target.value}))} style={{...selStyle, marginBottom:12}}>
+                    {statuses.map(s => <option key={s.name}>{s.name}</option>)}
+                  </select>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={saveEdit} disabled={!editForm.title.trim()} style={{...btnPrimary, flex:1, fontSize:12}}>💾 Save</button>
+                    <button onClick={() => setEditingId(null)} style={{...btnSecondary, flex:1, fontSize:12}}>Cancel</button>
+                  </div>
+                </>
+              ) : confirmDeleteId === h.id ? (
+                <div style={{ display:"flex", alignItems:"center", gap:10, background:"#1a0d0d", borderRadius:8, padding:"8px 12px" }}>
+                  <span style={{ flex:1, fontSize:12, color:"#c8b89a" }}>Delete <strong>"{h.title.slice(0,40)}{h.title.length>40?"…":""}"</strong>?</span>
+                  <button onClick={() => { removeHook(h.id); setConfirmDeleteId(null); }} style={{ background:"#6b1a1a", color:"#e8d5b7", border:"none", borderRadius:6, padding:"4px 12px", cursor:"pointer", fontWeight:700, fontSize:12 }}>Delete</button>
+                  <button onClick={() => setConfirmDeleteId(null)} style={{ background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 12px", cursor:"pointer", fontSize:12 }}>Cancel</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom: h.description ? 8 : 0 }}>
+                    <span style={{ fontSize:10, color:sc, background:sc+"22", border:`1px solid ${sc}44`, borderRadius:8, padding:"2px 8px", flexShrink:0, marginTop:2 }}>{h.status}</span>
+                    <span style={{ fontSize:14, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", flex:1 }}>{h.title}</span>
+                    <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                      {onPinHook && (() => { const isPinned = pinnedHookIds?.has(`${char.id}::${h.id}`); return (
+                        <button onClick={() => onPinHook(char.id, h.id)} style={{...btnSecondary, fontSize:12, padding:"4px 10px", display:"flex", alignItems:"center", gap:4, color: isPinned ? "#c8a96e" : "#9a7fa0", borderColor: isPinned ? "#c8a96e66" : undefined}}>
+                          📌 <span>{isPinned ? "Pinned" : "Pin to reminders"}</span>
+                        </button>
+                      ); })()}
+                      <button onClick={() => { setEditingId(h.id); setEditForm({title:h.title, description:h.description||"", status:h.status||defaultStatus}); }} style={{...btnSecondary, fontSize:12, padding:"4px 10px"}}>✏️</button>
+                      <button onClick={() => setConfirmDeleteId(h.id)} style={{...btnSecondary, fontSize:12, padding:"4px 10px", color:"#c06060", borderColor:"#6b1a1a"}}>🗑️</button>
+                    </div>
+                  </div>
+                  {h.description && <div style={{ fontSize:13, color:"#b09080", lineHeight:1.6, whiteSpace:"pre-wrap", paddingLeft:2 }}>{h.description}</div>}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Char Timeline ─────────────────────────────────────────────────────────────
 function CharTimeline({ evGroupMap, evGroupOrder, evUndated, stories, onOpenStory }) {
   const [collapsed, setCollapsed] = useState({});
@@ -183,24 +293,27 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts }) {
   );
 }
 
-function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, relationshipTypes, onClose, onDelete, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, artifacts, onUpdateArtifacts, subTab: subTabProp, onSubTabChange }) {
+function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, artifacts, onUpdateArtifacts, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, isEditing, onSetEditing }) {
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;
   const setSubTab = onSubTabChange ?? setSubTabInternal;
   const [descExpanded, setDescExpanded] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({...char});
   const [lightbox, setLightbox] = useState(null);
+  const [activeTextTab, setActiveTextTab] = useState("biography");
+  const [renamingTabId, setRenamingTabId] = useState(null);
+  const [renameVal, setRenameVal] = useState("");
+  const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
 
-  useEffect(() => { setIsEditing(false); setEditForm({...char}); setDescExpanded(false); }, [char?.id]);
+  useEffect(() => { setEditForm({...char}); setDescExpanded(false); setActiveTextTab("biography"); }, [char?.id]); // eslint-disable-line
 
   if (!char) return null;
 
   const set = (k, v) => setEditForm(f => ({...f, [k]:v}));
-  const handleSave = () => { onUpdateChar(editForm); setIsEditing(false); };
-  const handleCancelEdit = () => { setIsEditing(false); setEditForm({...char}); };
+  const handleSave = () => { const {_isNew, ...clean} = editForm; onUpdateChar({...char, ...clean}); onSetEditing(false); };
+  const handleCancelEdit = () => { if (char._isNew) { onCancelNew?.(char.id); return; } onSetEditing(false); setEditForm({...char}); };
 
-  const linkedStories = stories.filter(s=>s.characterIds.includes(char.id));
+  const linkedStories = stories.filter(s=>(s.characterIds||[]).includes(char.id));
   const linkedFactions = factions.filter(f=>(char.factions||[]).some(e=>e.factionId===f.id));
   const relationships = char.relationships||[];
   const raceLabel = getRaceLabel(races, char.raceId, char.subraceId);
@@ -264,11 +377,11 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
           {isEditing ? (
             <>
               <button onClick={handleSave} disabled={!editForm.name.trim()} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>💾 Save</button>
-              <button onClick={handleCancelEdit} style={{...btnSecondary,fontSize:12,padding:"6px 14px"}}>Cancel</button>
+              <button onClick={handleCancelEdit} style={{...btnSecondary,fontSize:12,padding:"6px 14px"}}>{char._isNew ? "Discard" : "Cancel"}</button>
             </>
           ) : (
             <>
-              <button onClick={()=>setIsEditing(true)} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>✏️ Edit</button>
+              <button onClick={()=>onSetEditing(true)} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>✏️ Edit</button>
               {onDelete&&<button onClick={()=>onDelete(char.id)} style={{...btnSecondary,fontSize:12,padding:"6px 14px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️ Delete</button>}
             </>
           )}
@@ -362,10 +475,53 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             ))}
             <button onClick={()=>set("factions",[...(editForm.factions||[]),{id:uid(),factionId:"",role:""}])} style={{...btnSecondary,fontSize:12,padding:"5px 14px"}}>+ Add Faction</button>
           </div>
-          {/* Description / Biography */}
+          {/* Biography / Custom Text Tabs */}
           <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>{editForm.type==="player"?"Biography":"Description"}</label>
-            <textarea value={editForm.description||""} onChange={e=>set("description",e.target.value)} rows={8} style={{...inputStyle,resize:"vertical"}}/>
+            {/* Tab bar */}
+            <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap" }}>
+              {/* Biography — permanent */}
+              <button onClick={()=>setActiveTextTab("biography")} style={{ padding:"4px 12px", borderRadius:"6px 6px 0 0", border:"1px solid", borderColor: activeTextTab==="biography"?"#7c5cbf":"#3a2a5a", borderBottom: activeTextTab==="biography"?"1px solid #1a1228":"1px solid #3a2a5a", background: activeTextTab==="biography"?"#2a1f3d":"transparent", color: activeTextTab==="biography"?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:12, fontWeight:700 }}>
+                {editForm.type==="player"?"Biography":"Description"}
+              </button>
+              {/* Custom tabs */}
+              {(editForm.textTabs||[]).map(t => (
+                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:2 }}>
+                  {confirmDeleteTabId===t.id ? (
+                    <div style={{ display:"flex", alignItems:"center", gap:4, background:"#1a0f0f", border:"1px solid #6b1a1a", borderRadius:6, padding:"3px 8px" }}>
+                      <span style={{ fontSize:11, color:"#c06060" }}>Delete "{t.name}"?</span>
+                      <button onClick={()=>{ if(activeTextTab===t.id) setActiveTextTab("biography"); set("textTabs",(editForm.textTabs||[]).filter(x=>x.id!==t.id)); setConfirmDeleteTabId(null); }} style={{ background:"#6b1a1a", border:"none", borderRadius:4, color:"#e8d5b7", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Delete</button>
+                      <button onClick={()=>setConfirmDeleteTabId(null)} style={{ background:"none", border:"1px solid #3a2a5a", borderRadius:4, color:"#9a7fa0", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Cancel</button>
+                    </div>
+                  ) : renamingTabId===t.id ? (
+                    <input autoFocus value={renameVal} onChange={e=>setRenameVal(e.target.value)}
+                      onBlur={()=>{ set("textTabs",(editForm.textTabs||[]).map(x=>x.id===t.id?{...x,name:renameVal.trim()||x.name}:x)); setRenamingTabId(null); }}
+                      onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Escape"){ set("textTabs",(editForm.textTabs||[]).map(x=>x.id===t.id?{...x,name:renameVal.trim()||x.name}:x)); setRenamingTabId(null); } }}
+                      style={{ width:90, padding:"3px 6px", fontSize:12, background:"#0d0b14", border:"1px solid #7c5cbf", borderRadius:4, color:"#e8d5b7", outline:"none" }}/>
+                  ) : (
+                    <div style={{ display:"flex", alignItems:"center", gap:1 }}>
+                      <button onClick={()=>setActiveTextTab(t.id)}
+                        style={{ padding:"4px 10px", borderRadius:"6px 6px 0 0", border:"1px solid", borderColor: activeTextTab===t.id?"#7c5cbf":"#3a2a5a", borderBottom: activeTextTab===t.id?"1px solid #1a1228":"1px solid #3a2a5a", background: activeTextTab===t.id?"#2a1f3d":"transparent", color: activeTextTab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:12, fontWeight:700 }}>
+                        {t.name}
+                      </button>
+                      <button onClick={()=>{ setRenamingTabId(t.id); setRenameVal(t.name); }} title="Rename tab"
+                        style={{ padding:"2px 5px", borderRadius:4, border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}
+                        onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✏️</button>
+                      <button onClick={()=>setConfirmDeleteTabId(t.id)} title="Delete tab"
+                        style={{ padding:"2px 5px", borderRadius:4, border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}
+                        onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✕</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <button onClick={()=>{ const id=uid(); set("textTabs",[...(editForm.textTabs||[]),{id,name:"New Tab",content:""}]); setActiveTextTab(id); setRenamingTabId(id); setRenameVal(""); }} style={{ padding:"4px 10px", borderRadius:6, border:"1px dashed #3a2a5a", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:12 }}>+ Tab</button>
+            </div>
+            {/* Content area */}
+            <div style={{ borderTop:"1px solid #3a2a5a", paddingTop:8 }}>
+              {activeTextTab==="biography"
+                ? <textarea value={editForm.description||""} onChange={e=>set("description",e.target.value)} rows={8} style={{...inputStyle,resize:"vertical"}}/>
+                : (() => { const t=(editForm.textTabs||[]).find(x=>x.id===activeTextTab); return t ? <textarea value={t.content||""} onChange={e=>set("textTabs",(editForm.textTabs||[]).map(x=>x.id===activeTextTab?{...x,content:e.target.value}:x))} rows={8} style={{...inputStyle,resize:"vertical"}}/> : null; })()
+              }
+            </div>
           </div>
           {/* Secret (main only) */}
           {editForm.type==="main"&&(
@@ -406,6 +562,9 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             <button onClick={()=>setSubTab("timeline")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="timeline"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="timeline"?700:400, borderBottom:subTab==="timeline"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
               ⏳ Timeline{charEvents.length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{charEvents.length}</span>}
             </button>
+            <button onClick={()=>setSubTab("hooks")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="hooks"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="hooks"?700:400, borderBottom:subTab==="hooks"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
+              🔮 Hooks{(char.hooks||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.hooks||[]).length}</span>}
+            </button>
             {isPlayer&&<button onClick={()=>setSubTab("files")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="files"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="files"?700:400, borderBottom:subTab==="files"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
               📁 Files{(char.files||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.files||[]).length}</span>}
             </button>}
@@ -414,22 +573,37 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             <div style={{ display:"flex", flexWrap:"wrap" }}>
               {(isPlayer?char.origin:locationName)&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>📍 {isPlayer?"Origin":"Location"}</div><div style={{ color:"#c8b89a", fontSize:14 }}>{isPlayer?char.origin:locationName}</div></div>}
               {char.status&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>💀 Status</div><div style={{ display:"inline-block", background:(charStatuses||[]).find(s=>s.name===char.status)?.color||CHAR_STATUS_COLORS[char.status]||"#4a4a6a", color:"#e8d5b7", borderRadius:4, padding:"2px 10px", fontSize:13, fontWeight:700 }}>{char.status}</div></div>}
-              {char.description&&(()=>{
+              {(char.description||(char.textTabs||[]).length>0)&&(()=>{
+                const allTextTabs = [{id:"biography",name:isPlayer?"Biography":"Description",content:char.description||""}, ...(char.textTabs||[])];
+                const activeContent = allTextTabs.find(t=>t.id===activeTextTab)?.content || "";
                 const PREVIEW = 500;
-                const needsFold = char.description.length > PREVIEW;
-                const visible = needsFold && !descExpanded ? char.description.slice(0, PREVIEW).trimEnd() + "…" : char.description;
+                const needsFold = activeContent.length > PREVIEW;
+                const visible = needsFold && !descExpanded ? activeContent.slice(0, PREVIEW).trimEnd() + "…" : activeContent;
                 return (
                   <div style={{ flex:"1 1 100%", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}>
-                    <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>{isPlayer?"📖 Biography":"📖 Description"}</div>
-                    <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{visible}</div>
-                    {needsFold&&(
-                      <button onClick={()=>setDescExpanded(v=>!v)}
-                        style={{ marginTop:10, background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 14px", color:"#7c5cbf", cursor:"pointer", fontSize:12, transition:"border-color .15s, color .15s" }}
-                        onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
-                        onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
-                        {descExpanded ? "▲ Show less" : "▼ Show more"}
-                      </button>
+                    {/* Tab bar */}
+                    {allTextTabs.length > 1 && (
+                      <div style={{ display:"flex", gap:4, marginBottom:10, flexWrap:"wrap" }}>
+                        {allTextTabs.map(t => (
+                          <button key={t.id} onClick={()=>{ setActiveTextTab(t.id); setDescExpanded(false); }}
+                            style={{ padding:"3px 10px", borderRadius:6, border:"1px solid", borderColor: activeTextTab===t.id?"#7c5cbf":"#3a2a5a", background: activeTextTab===t.id?"#2a1f3d":"transparent", color: activeTextTab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:11, fontWeight:700 }}>
+                            {t.name}
+                          </button>
+                        ))}
+                      </div>
                     )}
+                    <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>📖 {allTextTabs.find(t=>t.id===activeTextTab)?.name || (isPlayer?"Biography":"Description")}</div>
+                    {activeContent ? <>
+                      <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{visible}</div>
+                      {needsFold&&(
+                        <button onClick={()=>setDescExpanded(v=>!v)}
+                          style={{ marginTop:10, background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 14px", color:"#7c5cbf", cursor:"pointer", fontSize:12, transition:"border-color .15s, color .15s" }}
+                          onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
+                          onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
+                          {descExpanded ? "▲ Show less" : "▼ Show more"}
+                        </button>
+                      )}
+                    </> : <div style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>No content yet.</div>}
                   </div>
                 );
               })()}
@@ -511,6 +685,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
               )}
             </div>
           )}
+          {subTab==="hooks"&&<CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds}/>}
           {isPlayer&&subTab==="files"&&onUpdateChar&&<FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
         </>
       )}

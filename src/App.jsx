@@ -12,8 +12,6 @@ import { useToastContext } from "./components/Toast.jsx";
 import GlobalSearch from "./components/GlobalSearch.jsx";
 import Avatar from "./components/Avatar.jsx";
 import CharModal from "./components/CharModal.jsx";
-import StoryModal from "./components/StoryModal.jsx";
-import FactionModal from "./components/FactionModal.jsx";
 import LocationModal from "./components/LocationModal.jsx";
 import GlobalTimeline from "./components/GlobalTimeline.jsx";
 import LoreTab from "./components/LoreTab.jsx";
@@ -159,7 +157,7 @@ function StoryPickerModal({ stories, onClose, onSelect }) {
   );
 }
 
-function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory, onOpenChar, onPinHook, onRemovePin, hookStatuses, onUpdateStory }) {
+function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory, onOpenChar, onPinHook, onPinCharHook, onRemovePin, hookStatuses, onUpdateStory, onUpdateChar }) {
   const [newPin, setNewPin] = useState("");
   const [newPinCharIds, setNewPinCharIds] = useState([]);
   const [addingSession, setAddingSession] = useState(false);
@@ -359,11 +357,45 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory, on
                   </div>
                 );
               })}
-              {(notes.pins||[]).filter(p=>!p.hookPin).length === 0 && (notes.pins||[]).filter(p=>p.hookPin).length === 0
+              {/* Char hook pins */}
+              {(notes.pins||[]).filter(p=>p.charHookPin).map(p => {
+                const ch = (chars||[]).find(c=>c.id===p.charId);
+                const hook = ch && (ch.hooks||[]).find(h=>h.id===p.hookId);
+                if (!ch || !hook) return null;
+                const statuses = hookStatuses || [];
+                const colorMap = Object.fromEntries(statuses.map(s=>[s.name, s.color]));
+                const sc = colorMap[hook.status] || "#7c5cbf";
+                return (
+                  <div key={p.id} style={{ borderBottom:"1px solid #1e1630", padding:"10px 14px", background:"#0f0c1a" }}>
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                          <Avatar src={ch.image} name={ch.name} size={28}/>
+                          <div>
+                            <div style={{ fontSize:11, color:"#5a4a7a", textTransform:"uppercase", letterSpacing:1 }}>🔮 Character Hook</div>
+                            <span onClick={()=>onOpenChar(ch)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer", fontWeight:700, textDecoration:"underline" }}>{ch.name}</span>
+                          </div>
+                        </div>
+                        <div style={{ fontSize:13, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", marginBottom: hook.description ? 4 : 0 }}>{hook.title}</div>
+                        {hook.description && <div style={{ fontSize:12, color:"#b09080", lineHeight:1.5, whiteSpace:"pre-wrap", marginBottom:8 }}>{hook.description}</div>}
+                        {statuses.length > 0 && (
+                          <select value={hook.status || statuses[0]?.name || ""}
+                            onChange={e => onUpdateChar?.({...ch, hooks: (ch.hooks||[]).map(h => h.id===hook.id ? {...h, status: e.target.value} : h)})}
+                            style={{ fontSize:11, background:"#1a1228", border:`1px solid ${sc}66`, borderRadius:6, color:sc, padding:"3px 8px", cursor:"pointer", outline:"none" }}>
+                            {statuses.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                          </select>
+                        )}
+                      </div>
+                      <button onClick={()=>onPinCharHook(ch.id, hook.id)} title="Unpin" style={{ background:"none", border:"none", color:"#c8a96e", cursor:"pointer", fontSize:14, padding:"2px 4px", flexShrink:0 }}>📌</button>
+                    </div>
+                  </div>
+                );
+              })}
+              {(notes.pins||[]).filter(p=>!p.hookPin&&!p.charHookPin).length === 0 && (notes.pins||[]).filter(p=>p.hookPin||p.charHookPin).length === 0
                 ? <div style={{ color:"#3a2a5a", fontSize:13, textAlign:"center", padding:"12px 18px" }}>No reminders pinned.</div>
-                : (notes.pins||[]).filter(p=>!p.hookPin).length === 0 ? null
+                : (notes.pins||[]).filter(p=>!p.hookPin&&!p.charHookPin).length === 0 ? null
                 : <div style={{ display:"flex", flexDirection:"column" }}>
-                    {(notes.pins||[]).filter(p=>!p.hookPin).map((p, pi, arr) => {
+                    {(notes.pins||[]).filter(p=>!p.hookPin&&!p.charHookPin).map((p, pi, arr) => {
                       const pinChars = (p.charIds?.length ? p.charIds : p.charId ? [p.charId] : []).map(id => allChars.find(c=>c.id===id)).filter(Boolean);
                       return (
                         <div key={p.id} style={{ borderBottom:"1px solid #1e1630" }}>
@@ -394,16 +426,13 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory, on
                               <div style={{ flex:1, minWidth:0 }}>
                                 <span style={{ fontSize:13, color:"#e8d5b7", lineHeight:1.5, overflowWrap:"break-word", wordBreak:"break-word", ...(p.done ? { background:"#1a3a1a", borderRadius:4, padding:"1px 5px", borderLeft:"3px solid #4a9a4a" } : {}) }}>{p.text}</span>
                                 {pinChars.length > 0 && (
-                                  <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:5 }}>
+                                  <div style={{ display:"flex", flexDirection:"row", flexWrap:"wrap", gap:8, marginTop:6 }}>
                                     {pinChars.map(pc => (
-                                      <div key={pc.id} onClick={() => onOpenChar?.(pc)} style={{ display:"flex", alignItems:"center", gap:6, cursor:"pointer", width:"fit-content" }}
-                                        onMouseEnter={e => e.currentTarget.querySelector(".pin-char-name").style.color="#a07ee8"}
-                                        onMouseLeave={e => e.currentTarget.querySelector(".pin-char-name").style.color="#7c5cbf"}>
-                                        <Avatar src={pc.image} name={pc.name} size={20}/>
-                                        <div>
-                                          <span className="pin-char-name" style={{ fontSize:11, color:"#7c5cbf", fontWeight:600, transition:"color .12s" }}>{pc.name} ↗</span>
-                                          {pc.shortDescription && <div style={{ fontSize:11, color:"#5a4a7a", lineHeight:1.3 }}>{pc.shortDescription}</div>}
-                                        </div>
+                                      <div key={pc.id} onClick={() => onOpenChar?.(pc)} style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", background:"#1a1228", border:"1px solid #2a1f3d", borderRadius:20, padding:"3px 10px 3px 4px" }}
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.querySelector(".pin-char-name").style.color="#a07ee8"; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor="#2a1f3d"; e.currentTarget.querySelector(".pin-char-name").style.color="#7c5cbf"; }}>
+                                        <Avatar src={pc.image} name={pc.name} size={18}/>
+                                        <span className="pin-char-name" style={{ fontSize:11, color:"#7c5cbf", fontWeight:600, transition:"color .12s", whiteSpace:"nowrap" }}>{pc.name} ↗</span>
                                       </div>
                                     ))}
                                   </div>
@@ -855,13 +884,12 @@ export default function App() {
     return imgs.filter(i => { if (seen.has(i.src)) return false; seen.add(i.src); return true; });
   }, [chars, artifacts, stories, loreEvents]);
   const [charModal, setCharModal] = useState(null);
-  const [storyModal, setStoryModal] = useState(null);
-  const [factionModal, setFactionModal] = useState(null);
   const [locationModal, setLocationModal] = useState(null);
   const DEFAULT_PAGE = {
     tab: "characters",
     selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null,
     charSubTab: "details", storySubTab: "details",
+    charEditing: false, storyEditing: false, factionEditing: false, locationEditing: false,
     prevTab: null, itemNavId: null, storyHighlightEventId: null, mapNavTarget: null,
     query: "", storyQuery: "", storyStatusFilter: "", locationQuery: "", locationTypeFilter: "",
     collapsedLocTypes: {}, filters: defaultFilters, mainCollapsed: false, sideCollapsed: false,
@@ -881,26 +909,8 @@ export default function App() {
   );
 
   // Derived from active page — keeps existing render code working
+  // tab is still needed for sidebar nav highlighting and the keydown handler
   const tab = pg.tab;
-  const prevTab = pg.prevTab;
-  const query = pg.query;
-  const storyQuery = pg.storyQuery;
-  const storyStatusFilter = pg.storyStatusFilter;
-  const locationQuery = pg.locationQuery;
-  const locationTypeFilter = pg.locationTypeFilter;
-  const collapsedLocTypes = pg.collapsedLocTypes;
-  const filters = pg.filters;
-  const mainCollapsed = pg.mainCollapsed;
-  const sideCollapsed = pg.sideCollapsed;
-  const charSubTab = pg.charSubTab;
-  const storySubTab = pg.storySubTab;
-  const itemNavId = pg.itemNavId;
-  const storyHighlightEventId = pg.storyHighlightEventId;
-  const mapNavTarget = pg.mapNavTarget;
-  const selectedChar = chars.find(c => c.id === pg.selectedCharId) || null;
-  const selectedStory = stories.find(s => s.id === pg.selectedStoryId) || null;
-  const selectedFaction = factions.find(f => f.id === pg.selectedFactionId) || null;
-  const selectedLocation = locations.find(l => l.id === pg.selectedLocationId) || null;
 
   const addPage = useCallback((initialStateOrTab = {}) => {
     const newId = uid();
@@ -993,9 +1003,6 @@ export default function App() {
       // Escape — close in priority order
       if (e.key === 'Escape') {
         if (searchOpen)    { setSearchOpen(false); return; }
-        if (charModal)     { setCharModal(null); return; }
-        if (storyModal)    { setStoryModal(null); return; }
-        if (factionModal)  { setFactionModal(null); return; }
         if (locationModal) { setLocationModal(null); return; }
         if (confirm)       { closeConfirm(); return; }
         updPg({ selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null });
@@ -1003,17 +1010,17 @@ export default function App() {
       }
 
       // N — new item on current tab (skip if typing or a modal is open)
-      if (e.key === 'n' && !inInput && !charModal && !storyModal && !factionModal && !locationModal && !searchOpen) {
+      if (e.key === 'n' && !inInput && !locationModal && !searchOpen) {
         e.preventDefault();
-        if (tab === 'characters') setCharModal({...defaultChar, type:'main'});
-        else if (tab === 'stories')   setStoryModal({...defaultStory});
-        else if (tab === 'factions')  setFactionModal({...defaultFaction});
+        if (tab === 'characters') openCharModal('main');
+        else if (tab === 'stories')   openStoryModal();
+        else if (tab === 'factions')  openFactionModal();
         else if (tab === 'locations') setLocationModal({...defaultLocation});
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [tab, searchOpen, charModal, storyModal, factionModal, locationModal, confirm, closeConfirm]);
+  }, [tab, searchOpen, locationModal, confirm, closeConfirm]); // eslint-disable-line
 
   // ── Load campaign blob into state ────────────────────────────────────────────
   const applyBlob = useCallback(blob => {
@@ -1114,17 +1121,21 @@ export default function App() {
     saveTimerRef.current = setTimeout(async () => {
       const blob = {
         chars, stories, races, factions, locations, notes, loreEvents, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, mapData,
-        nav: { tab, prevTab, selectedCharId:selectedChar?.id||null, selectedStoryId:selectedStory?.id||null, selectedFactionId:selectedFaction?.id||null, selectedLocationId:selectedLocation?.id||null },
+        nav: { tab: pg.tab, prevTab: pg.prevTab, selectedCharId: pg.selectedCharId||null, selectedStoryId: pg.selectedStoryId||null, selectedFactionId: pg.selectedFactionId||null, selectedLocationId: pg.selectedLocationId||null },
       };
       try { await store.set(`fwb_campaign_${activeCampaignId}`, JSON.stringify(blob)); } catch {}
     }, 500);
     return () => clearTimeout(saveTimerRef.current);
-  }, [chars, stories, races, factions, locations, notes, loreEvents, relations, artifacts, charStatuses, relationshipTypes, mapData, tab, prevTab, selectedChar, selectedStory, selectedFaction, selectedLocation, loaded, activeCampaignId]); // eslint-disable-line
+  }, [chars, stories, races, factions, locations, notes, loreEvents, relations, artifacts, charStatuses, relationshipTypes, mapData, pg, loaded, activeCampaignId]); // eslint-disable-line
+
+  const updateChar = useCallback(updated => { pushHistory(); setChars(prev => prev.map(c => c.id===updated.id ? updated : c)); }, [pushHistory]);
 
   const saveChar = useCallback(form => {
     pushHistory();
+    const isNew = form._isNew;
     const savedId = form.id || uid();
-    const savedForm = { ...form, id: savedId };
+    const {_isNew, ...cleanForm} = form;
+    const savedForm = { ...cleanForm, id: savedId };
     setChars(prev => {
       const old = prev.find(c => c.id === savedId);
       const oldRels = old?.relationships || [];
@@ -1144,7 +1155,7 @@ export default function App() {
         });
     });
     setCharModal(null);
-    showToast(form.id ? "Character updated" : "Character added");
+    showToast(isNew || !form.id ? "Character added" : "Character updated");
   }, [pushHistory, showToast]);
 
   const deleteChar = useCallback(id => {
@@ -1153,19 +1164,12 @@ export default function App() {
       pushHistory();
       setChars(prev=>prev.filter(x=>x.id!==id).map(c=>({...c,relationships:(c.relationships||[]).filter(r=>r.charId!==id)})));
       updPgFn(p => p.selectedCharId===id ? { selectedCharId: null } : {});
-      setStories(prev=>prev.map(s=>({...s,characterIds:s.characterIds.filter(x=>x!==id),events:(s.events||[]).map(e=>({...e,characterIds:(e.characterIds||[]).filter(x=>x!==id)}))})));
+      setStories(prev=>prev.map(s=>({...s,characterIds:(s.characterIds||[]).filter(x=>x!==id),events:(s.events||[]).map(e=>({...e,characterIds:(e.characterIds||[]).filter(x=>x!==id)}))})));
       closeConfirm();
       showToast("Character deleted", "error");
     });
   }, [chars, updPgFn, askConfirm, closeConfirm, pushHistory, showToast]);
 
-  const saveStory = useCallback(form => {
-    pushHistory();
-    const w = {...form, events:form.events||[]};
-    setStories(prev => form.id ? prev.map(s=>s.id===form.id?w:s) : [...prev,{...w,id:uid()}]);
-    setStoryModal(null);
-    showToast(form.id ? "Story updated" : "Story added");
-  }, [pushHistory, showToast]);
 
   const deleteStory = useCallback(id => {
     const s = stories.find(x=>x.id===id);
@@ -1192,10 +1196,8 @@ export default function App() {
 
   const saveFaction = useCallback(form => {
     pushHistory();
-    const saved = form.id ? form : {...form, id:uid()};
-    setFactions(prev => form.id ? prev.map(f=>f.id===form.id?saved:f) : [...prev,saved]);
-    if (!form.id) setFactionModal(null);
-    showToast(form.id ? "Faction updated" : "Faction added");
+    setFactions(prev => prev.map(f => f.id === form.id ? form : f));
+    showToast("Faction saved");
   }, [pushHistory, showToast]);
 
   const deleteFaction = useCallback(id => {
@@ -1273,9 +1275,42 @@ export default function App() {
   }, [showToast]);
 
   // Stable modal openers for tab components
-  const openCharModal = useCallback(type => setCharModal({...defaultChar, type}), []);
-  const openStoryModal = useCallback(() => setStoryModal({...defaultStory}), []);
-  const openFactionModal = useCallback(() => setFactionModal({...defaultFaction}), []);
+  const openCharModal = useCallback(type => {
+    const newId = uid();
+    const newChar = {...defaultChar, type, id: newId, _isNew: true};
+    pushHistory();
+    setChars(prev => [...prev, newChar]);
+    updPgFn(p => ({...p, tab: "characters", selectedCharId: newId, charEditing: true}));
+  }, [pushHistory, updPgFn]);
+
+  const cancelNewChar = useCallback(id => {
+    setChars(prev => prev.filter(c => c.id !== id));
+    updPgFn(p => ({...p, selectedCharId: null, charEditing: false}));
+  }, [updPgFn]);
+  const openStoryModal = useCallback(() => {
+    const newId = uid();
+    const newStory = {...defaultStory, id: newId, _isNew: true};
+    pushHistory();
+    setStories(prev => [...prev, newStory]);
+    updPgFn(p => ({...p, tab: "stories", selectedStoryId: newId, storyEditing: true}));
+  }, [pushHistory, updPgFn]);
+
+  const cancelNewStory = useCallback(id => {
+    setStories(prev => prev.filter(s => s.id !== id));
+    updPgFn(p => ({...p, selectedStoryId: null, storyEditing: false}));
+  }, [updPgFn]);
+  const openFactionModal = useCallback(() => {
+    const newId = uid();
+    const newFaction = {...defaultFaction, id: newId, _isNew: true};
+    pushHistory();
+    setFactions(prev => [...prev, newFaction]);
+    updPgFn(p => ({...p, tab: "factions", selectedFactionId: newId, factionEditing: true}));
+  }, [pushHistory, updPgFn]);
+
+  const cancelNewFaction = useCallback(id => {
+    setFactions(prev => prev.filter(f => f.id !== id));
+    updPgFn(p => ({...p, selectedFactionId: null, factionEditing: false}));
+  }, [updPgFn]);
   const openLocationModal = useCallback(() => setLocationModal({...defaultLocation}), []);
 
   // Navigate to items tab from story detail (uses updPgFn to avoid stale tab closure)
@@ -1311,10 +1346,10 @@ export default function App() {
       factions: factionsRef.current, locations: locationsRef.current, notes: notesRef.current,
       loreEvents: loreEventsRef.current, relations: relationsRef.current, artifacts: artifactsRef.current,
       charStatuses: charStatusesRef.current, relationshipTypes: relTypesRef.current, mapData: mapDataRef.current,
-      nav: { tab, prevTab, selectedCharId:selectedChar?.id||null, selectedStoryId:selectedStory?.id||null, selectedFactionId:selectedFaction?.id||null, selectedLocationId:selectedLocation?.id||null },
+      nav: { tab: pg.tab, prevTab: pg.prevTab, selectedCharId: pg.selectedCharId||null, selectedStoryId: pg.selectedStoryId||null, selectedFactionId: pg.selectedFactionId||null, selectedLocationId: pg.selectedLocationId||null },
     };
     try { await store.set(`fwb_campaign_${campaignId}`, JSON.stringify(blob)); } catch {}
-  }, [tab, prevTab, selectedChar, selectedStory, selectedFaction, selectedLocation]);
+  }, [pg]);
 
   const switchCampaign = useCallback(async campaign => {
     clearTimeout(saveTimerRef.current);
@@ -1374,39 +1409,7 @@ export default function App() {
     }
   }, [campaigns, activeCampaignId, resetWorldState, applyBlob]);
 
-  const { players, main, side } = useMemo(() => {
-    const q = query.toLowerCase();
-    const filterChars = list => list.filter(c => {
-      const raceLabel = getRaceLabel(races,c.raceId,c.subraceId).toLowerCase();
-      const locationLabel = locations.find(l=>l.id===c.locationId)?.name?.toLowerCase()||"";
-      const factionLabels = factions.filter(f=>(c.factions||[]).some(e=>e.factionId===f.id)).map(f=>f.name.toLowerCase()).join(" ");
-      const matchQ = !q||["name","shortDescription","description","secret","origin","class"].some(k=>c[k]?.toLowerCase().includes(q))||raceLabel.includes(q)||locationLabel.includes(q)||factionLabels.includes(q);
-      const matchF = (!filters.raceId||c.raceId===filters.raceId)&&(!filters.locationId||c.locationId===filters.locationId)&&(!filters.status||c.status===filters.status)&&(!filters.factionId||(c.factions||[]).some(e=>e.factionId===filters.factionId));
-      return matchQ&&matchF;
-    });
-    return {
-      players: filterChars(chars.filter(c=>c.type==="player")),
-      main:    filterChars(chars.filter(c=>c.type==="main")).sort((a,b)=>a.name.localeCompare(b.name)),
-      side:    filterChars(chars.filter(c=>c.type==="side")).sort((a,b)=>a.name.localeCompare(b.name)),
-    };
-  }, [chars, query, filters, races, locations, factions]);
-
-  const { mainStory, playerStories, otherStories } = useMemo(() => {
-    const q = storyQuery.toLowerCase();
-    return {
-      mainStory:    stories.find(s=>s.isMain)||null,
-      playerStories: stories.filter(s=>s.playerId&&!s.isMain),
-      otherStories: stories.filter(s=>!s.isMain&&!s.playerId).filter(s=>{
-        const matchText=!q||s.name.toLowerCase().includes(q)||(s.summary||"").toLowerCase().includes(q);
-        return matchText&&(!storyStatusFilter||s.status===storyStatusFilter);
-      }),
-    };
-  }, [stories, storyQuery, storyStatusFilter]);
-
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
-
-  // All players unfiltered — for the players row in CharactersTabContent
-  const allPlayers = useMemo(() => chars.filter(c => c.type==="player"), [chars]);
 
   // Pinned hooks — toggle a story hook in notes.pins
   const handlePinHook = useCallback((storyId, hookId) => {
@@ -1426,6 +1429,18 @@ export default function App() {
     new Set((notes.pins||[]).filter(p=>p.hookPin).map(p=>`${p.storyId}::${p.hookId}`))
   , [notes.pins]);
 
+  const handlePinCharHook = useCallback((charId, hookId) => {
+    pushHistory();
+    setNotes(n => {
+      const already = (n.pins||[]).find(p => p.charHookPin && p.charId===charId && p.hookId===hookId);
+      if (already) return {...n, pins: n.pins.filter(p => p.id !== already.id)};
+      return {...n, pins: [{id: uid(), charHookPin: true, charId, hookId}, ...(n.pins||[])]};
+    });
+  }, [setNotes, pushHistory]);
+  const pinnedCharHookIds = useMemo(() =>
+    new Set((notes.pins||[]).filter(p=>p.charHookPin).map(p=>`${p.charId}::${p.hookId}`))
+  , [notes.pins]);
+
   // Latest timeline date across all stories — for EventModal "Insert" shortcut
   const currentTimelineDate = useMemo(() => {
     const all = stories.flatMap(s=>s.events||[]).filter(e=>e.year);
@@ -1437,6 +1452,16 @@ export default function App() {
     })[0];
     return [latest.year,latest.month,latest.day].filter(Boolean).join(" / ");
   }, [stories]);
+
+  // Stable per-page updater (cached by page id so memo'd children don't thrash)
+  const pageUpdaterCacheRef = useRef({});
+  const getPageUpdPg = (pageId) => {
+    if (!pageUpdaterCacheRef.current[pageId]) {
+      pageUpdaterCacheRef.current[pageId] = updates =>
+        setPages(ps => ps.map(p => p.id === pageId ? {...p, ...updates} : p));
+    }
+    return pageUpdaterCacheRef.current[pageId];
+  };
 
   if (!loaded) return (
     <div style={{ display:"flex", height:"100vh", alignItems:"center", justifyContent:"center", background:"#0d0b14", color:"#5a4a7a", fontSize:15, fontFamily:"Georgia,serif" }}>
@@ -1520,82 +1545,126 @@ export default function App() {
               </div>
             );
           })}
-          <button onClick={()=>addPage()} title="New tab (Ctrl+Click a section in the sidebar)"
-            style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:18, padding:"0 6px", lineHeight:1, transition:"color .12s" }}
-            onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>+</button>
+          <button onClick={()=>addPage()} title="New tab"
+            style={{ background:"none", border:"1px solid transparent", borderRadius:4, color:"#5a4a7a", cursor:"pointer", fontSize:14, fontWeight:700, padding:"1px 7px", lineHeight:"20px", transition:"color .12s, border-color .12s", marginLeft:2 }}
+            onMouseEnter={e=>{ e.currentTarget.style.color="#c8a96e"; e.currentTarget.style.borderColor="#3a2a5a"; }} onMouseLeave={e=>{ e.currentTarget.style.color="#5a4a7a"; e.currentTarget.style.borderColor="transparent"; }}>+</button>
         </div>
-        {prevTab&&prevTab!==tab&&(
-          <div style={{ padding:"18px 32px 0", flexShrink:0 }}>
-            <button onClick={()=>updPg({ tab: prevTab, prevTab: null })} style={{ display:"inline-flex", alignItems:"center", gap:6, background:"transparent", border:"1px solid #3a2a5a", borderRadius:8, padding:"6px 14px", color:"#7c5cbf", cursor:"pointer", fontSize:13, fontWeight:600, transition:"border-color .15s, color .15s" }}
-              onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
-              ← Back to {ALL_TABS.find(t=>t.id===prevTab)?.label||prevTab}
-            </button>
-          </div>
-        )}
-        <div style={{ display: tab==="characters" ? "contents" : "none" }}>
-          <CharactersTabContent
-            chars={chars} races={races} factions={factions} locations={locations}
-            stories={stories} loreEvents={loreEvents} artifacts={artifacts}
-            charStatuses={charStatuses} storyStatuses={storyStatuses}
-            hookStatuses={hookStatuses} relationshipTypes={relationshipTypes}
-            allPlayers={allPlayers} main={main} side={side}
-            query={query} filters={filters}
-            selectedChar={selectedChar} selectedCharId={pg.selectedCharId}
-            charSubTab={charSubTab} mainCollapsed={mainCollapsed} sideCollapsed={sideCollapsed}
-            updPg={updPg}
-            onNewChar={openCharModal} onDeleteChar={deleteChar}
-            onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction} onOpenChar={handleOpenChar}
-            onSaveChar={saveChar} onUpdateArtifacts={updateArtifacts}/>
-        </div>
-        <div style={{ display: tab==="stories" ? "contents" : "none" }}>
-          <StoriesTabContent
-            stories={stories} chars={chars} factions={factions} locations={locations} artifacts={artifacts}
-            storyStatuses={storyStatuses} hookStatuses={hookStatuses}
-            storyQuery={storyQuery} storyStatusFilter={storyStatusFilter}
-            selectedStory={selectedStory} selectedStoryId={pg.selectedStoryId}
-            storySubTab={storySubTab} storyHighlightEventId={storyHighlightEventId}
-            mainStory={mainStory} playerStories={playerStories} otherStories={otherStories}
-            currentTimelineDate={currentTimelineDate}
-            updPg={updPg}
-            onNewStory={openStoryModal} onDeleteStory={deleteStory}
-            onSetMain={setMainStory} onSetPlayerStory={setPlayerStory} onUpdateStory={updateStory}
-            onOpenChar={handleOpenChar} onOpenFaction={handleOpenFaction} onOpenLocation={handleOpenLocation}
-            onOpenArtifact={handleOpenArtifactInStory} onUpdateArtifacts={updateArtifacts}
-            onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}
-            onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds}/>
-        </div>
-        <div style={{ display: tab==="factions" ? "contents" : "none" }}>
-          <FactionsTabContent
-            factions={factions} chars={chars}
-            selectedFaction={selectedFaction} selectedFactionId={pg.selectedFactionId}
-            updPg={updPg}
-            onNewFaction={openFactionModal}
-            onSaveFaction={saveFaction} onDeleteFaction={deleteFaction} onOpenChar={handleOpenChar}/>
-        </div>
-        <div style={{ display: tab==="timeline" ? "contents" : "none" }}>
-          <div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}>
-            <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 6px", fontSize:26 }}>Timeline</h1>
-            <p style={{ color:"#5a4a7a", fontSize:13, margin:"0 0 24px" }}>All events across every story, grouped by date.</p>
-            <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar}/>
-          </div>
-        </div>
-        <div style={{ display: tab==="locations" ? "contents" : "none" }}>
-          <LocationsTabContent
-            locations={locations} chars={chars} factions={factions} stories={stories} mapData={mapData}
-            locationQuery={locationQuery} locationTypeFilter={locationTypeFilter} collapsedLocTypes={collapsedLocTypes}
-            selectedLocation={selectedLocation} selectedLocationId={pg.selectedLocationId}
-            updPg={updPg}
-            onNewLocation={openLocationModal}
-            onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
-            onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction}
-            onShowOnMap={handleShowOnMap}/>
-        </div>
-        <div style={{ display: tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={itemNavId}/></div>
-        <div style={{ display: tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={mapNavTarget}/></div>
-        <div style={{ display: tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}/></div></div>
-        <div style={{ display: tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTab notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} onUpdateStory={updateStory}/></div></div>
-        <div style={{ display: tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} setChars={updateCharsFromSettings}/></div></div>
+        {/* Each browser page tab gets its own independent component tree */}
+        {pages.map(p => {
+          const pageUpdPg = getPageUpdPg(p.id);
+
+          // Per-page char filtering
+          const pq = p.query.toLowerCase();
+          const filterPageChars = list => list.filter(c => {
+            const raceLabel = getRaceLabel(races,c.raceId,c.subraceId).toLowerCase();
+            const locationLabel = locations.find(l=>l.id===c.locationId)?.name?.toLowerCase()||"";
+            const factionLabels = factions.filter(f=>(c.factions||[]).some(e=>e.factionId===f.id)).map(f=>f.name.toLowerCase()).join(" ");
+            const matchQ = !pq||["name","shortDescription","description","secret","origin","class"].some(k=>c[k]?.toLowerCase().includes(pq))||raceLabel.includes(pq)||locationLabel.includes(pq)||factionLabels.includes(pq);
+            const pf = p.filters;
+            const matchF = (!pf.raceId||c.raceId===pf.raceId)&&(!pf.locationId||c.locationId===pf.locationId)&&(!pf.status||c.status===pf.status)&&(!pf.factionId||(c.factions||[]).some(e=>e.factionId===pf.factionId));
+            return matchQ && matchF;
+          });
+          const pAllPlayers = chars.filter(c => c.type==="player");
+          const pMain = filterPageChars(chars.filter(c=>c.type==="main")).sort((a,b)=>a.name.localeCompare(b.name));
+          const pSide = filterPageChars(chars.filter(c=>c.type==="side")).sort((a,b)=>a.name.localeCompare(b.name));
+
+          // Per-page story filtering
+          const sq = p.storyQuery.toLowerCase();
+          const pMainStory = stories.find(s=>s.isMain)||null;
+          const pPlayerStories = stories.filter(s=>s.playerId&&!s.isMain);
+          const pOtherStories = stories.filter(s=>!s.isMain&&!s.playerId).filter(s=>{
+            const matchText=!sq||s.name.toLowerCase().includes(sq)||(s.summary||"").toLowerCase().includes(sq);
+            return matchText&&(!p.storyStatusFilter||s.status===p.storyStatusFilter);
+          });
+
+          // Per-page selected entities
+          const pSelectedChar     = chars.find(c=>c.id===p.selectedCharId)||null;
+          const pSelectedStory    = stories.find(s=>s.id===p.selectedStoryId)||null;
+          const pSelectedFaction  = factions.find(f=>f.id===p.selectedFactionId)||null;
+          const pSelectedLocation = locations.find(l=>l.id===p.selectedLocationId)||null;
+
+          return (
+            <div key={p.id} style={{ display: p.id===activePageId ? "contents" : "none" }}>
+              {p.prevTab&&p.prevTab!==p.tab&&(
+                <div style={{ padding:"18px 32px 0", flexShrink:0 }}>
+                  <button onClick={()=>pageUpdPg({ tab: p.prevTab, prevTab: null })} style={{ display:"inline-flex", alignItems:"center", gap:6, background:"transparent", border:"1px solid #3a2a5a", borderRadius:8, padding:"6px 14px", color:"#7c5cbf", cursor:"pointer", fontSize:13, fontWeight:600, transition:"border-color .15s, color .15s" }}
+                    onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
+                    onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
+                    ← Back to {ALL_TABS.find(t=>t.id===p.prevTab)?.label||p.prevTab}
+                  </button>
+                </div>
+              )}
+              <div style={{ display: p.tab==="characters" ? "contents" : "none" }}>
+                <CharactersTabContent
+                  chars={chars} races={races} factions={factions} locations={locations}
+                  stories={stories} loreEvents={loreEvents} artifacts={artifacts}
+                  charStatuses={charStatuses} storyStatuses={storyStatuses}
+                  hookStatuses={hookStatuses} relationshipTypes={relationshipTypes}
+                  allPlayers={pAllPlayers} main={pMain} side={pSide}
+                  query={p.query} filters={p.filters}
+                  selectedChar={pSelectedChar} selectedCharId={p.selectedCharId}
+                  charSubTab={p.charSubTab} mainCollapsed={p.mainCollapsed} sideCollapsed={p.sideCollapsed}
+                  updPg={pageUpdPg}
+                  onNewChar={openCharModal} onDeleteChar={deleteChar} onCancelNew={cancelNewChar}
+                  onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction} onOpenChar={handleOpenChar}
+                  onSaveChar={saveChar} onUpdateArtifacts={updateArtifacts}
+                  onPinCharHook={handlePinCharHook} pinnedCharHookIds={pinnedCharHookIds}
+                  isEditing={p.charEditing} onSetEditing={v=>pageUpdPg({ charEditing: v })}/>
+              </div>
+              <div style={{ display: p.tab==="stories" ? "contents" : "none" }}>
+                <StoriesTabContent
+                  stories={stories} chars={chars} factions={factions} locations={locations} artifacts={artifacts}
+                  storyStatuses={storyStatuses} hookStatuses={hookStatuses}
+                  storyQuery={p.storyQuery} storyStatusFilter={p.storyStatusFilter}
+                  selectedStory={pSelectedStory} selectedStoryId={p.selectedStoryId}
+                  storySubTab={p.storySubTab} storyHighlightEventId={p.storyHighlightEventId}
+                  mainStory={pMainStory} playerStories={pPlayerStories} otherStories={pOtherStories}
+                  currentTimelineDate={currentTimelineDate}
+                  updPg={pageUpdPg}
+                  onNewStory={openStoryModal} onDeleteStory={deleteStory} onCancelNew={cancelNewStory}
+                  onSetMain={setMainStory} onSetPlayerStory={setPlayerStory} onUpdateStory={updateStory}
+                  onOpenChar={handleOpenChar} onOpenFaction={handleOpenFaction} onOpenLocation={handleOpenLocation}
+                  onOpenArtifact={handleOpenArtifactInStory} onUpdateArtifacts={updateArtifacts}
+                  onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}
+                  onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds}
+                  isEditing={p.storyEditing} onSetEditing={v=>pageUpdPg({ storyEditing: v })}/>
+              </div>
+              <div style={{ display: p.tab==="factions" ? "contents" : "none" }}>
+                <FactionsTabContent
+                  factions={factions} chars={chars}
+                  selectedFaction={pSelectedFaction} selectedFactionId={p.selectedFactionId}
+                  updPg={pageUpdPg}
+                  onNewFaction={openFactionModal} onCancelNew={cancelNewFaction}
+                  onSaveFaction={saveFaction} onDeleteFaction={deleteFaction} onOpenChar={handleOpenChar}
+                  isEditing={p.factionEditing} onSetEditing={v=>pageUpdPg({ factionEditing: v })}/>
+              </div>
+              <div style={{ display: p.tab==="timeline" ? "contents" : "none" }}>
+                <div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}>
+                  <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 6px", fontSize:26 }}>Timeline</h1>
+                  <p style={{ color:"#5a4a7a", fontSize:13, margin:"0 0 24px" }}>All events across every story, grouped by date.</p>
+                  <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar}/>
+                </div>
+              </div>
+              <div style={{ display: p.tab==="locations" ? "contents" : "none" }}>
+                <LocationsTabContent
+                  locations={locations} chars={chars} factions={factions} stories={stories} mapData={mapData}
+                  locationQuery={p.locationQuery} locationTypeFilter={p.locationTypeFilter} collapsedLocTypes={p.collapsedLocTypes}
+                  selectedLocation={pSelectedLocation} selectedLocationId={p.selectedLocationId}
+                  updPg={pageUpdPg}
+                  onNewLocation={openLocationModal}
+                  onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
+                  onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction}
+                  onShowOnMap={handleShowOnMap}
+                  isEditing={p.locationEditing} onSetEditing={v=>pageUpdPg({ locationEditing: v })}/>
+              </div>
+              <div style={{ display: p.tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={p.itemNavId}/></div>
+              <div style={{ display: p.tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={p.mapNavTarget}/></div>
+              <div style={{ display: p.tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}/></div></div>
+              <div style={{ display: p.tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTab notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onPinCharHook={handlePinCharHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} onUpdateStory={updateStory} onUpdateChar={updateChar}/></div></div>
+              <div style={{ display: p.tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} setChars={updateCharsFromSettings}/></div></div>
+            </div>
+          );
+        })}
       </div>
 
       {helpOpen && (
@@ -1672,9 +1741,8 @@ export default function App() {
         </div>
       )}
       {confirm&&<ConfirmDialog message={confirm.message} onConfirm={confirm.onConfirm} onCancel={closeConfirm}/>}
-      {charModal&&<CharModal char={charModal} chars={chars} races={races} factions={factions} locations={locations} charStatuses={charStatuses} onClose={()=>setCharModal(null)} onSave={saveChar}/>}
-      {storyModal&&<StoryModal story={storyModal} chars={chars} factions={factions} locations={locations} onClose={()=>setStoryModal(null)} onSave={saveStory}/>}
-      {factionModal&&<FactionModal faction={factionModal} onClose={()=>setFactionModal(null)} onSave={saveFaction}/>}
+
+
       {locationModal&&<LocationModal location={locationModal} onClose={()=>setLocationModal(null)} onSave={saveLocation}/>}
       <GlobalSearch
         open={searchOpen} onClose={() => setSearchOpen(false)}

@@ -1,22 +1,57 @@
 # Changelog
 
-## v0.4.1 — QoL Improvements & Polish
+## v0.4.2 — Inline Factions, Timeline Quick-Jump & Crash Fix
 
-### Notes — Pinned Hooks
-- Story plot hooks can now be **pinned directly to Pinned Reminders** — click 📌 on any hook in the Stories → Hooks tab
-- Pinned hooks appear at the top of Pinned Reminders with the story name as a clickable link
-- Hook status can be changed directly from the Pinned Reminders list
-- Pinning and deleting pins are now **undoable** (Ctrl+Z)
+### Factions — Inline Creation & Editing
+- New factions are created **directly in the detail panel** — clicking **+ New Faction** opens a draft entry immediately without a popup modal, matching the pattern used by Characters, Stories, and Locations
+- Cancelling a new faction discards it cleanly without saving
+
+### Timeline — Horizontal Quick-Jump Bar
+- A **sticky scrubber bar** now sits at the top of the Global Timeline — it shows every dated group as a clickable dot with the year label above and event count below
+- Clicking any dot **smoothly scrolls** the timeline to that date group, centered on screen
+- The bar is **horizontally scrollable** when there are many entries
+- The active (last-jumped-to) dot and its corresponding spine node highlight in gold
+
+### Bug Fixes
+- Added a global **Error Boundary** — if a render error occurs anywhere in the app, a "Something went wrong" screen is shown with the error message instead of a blank white screen; the app can be recovered with "Try again"
+- Fixed crash when opening the "+ New Faction" panel (caused by an object being rendered directly as a React child)
+
+---
+
+## v0.4.1 — Characters Overhaul, Hooks & QoL
+
+### Characters — Inline Creation
+- New characters are created **directly in the detail panel** — clicking **+ Main** or **+ Side** opens a draft character immediately without a popup modal
+- Cancelling a new character discards it cleanly without saving
+
+### Characters — Biography Tabs
+- The Biography field is now a **tabbed text editor** — add as many custom tabs as you need alongside the permanent Biography tab
+- Rename any custom tab via the ✏️ button; delete with ✕ (inline confirmation required)
+
+### Characters — Hooks
+- New **🔮 Hooks** sub-tab on every character — add plot threads, reminders, and GM notes tied to a specific character
+- Same pattern as Story hooks: status per hook (customisable), reorder, delete with confirmation
+- Pin any character hook to **Pinned Reminders** with one click
+
+### Notes — Character Hook Pins
+- Pinned character hooks appear in Pinned Reminders with the character's **avatar**, character name as a clickable link, and an inline status dropdown
+- Character links are displayed as compact **horizontal pills** — avatar + name in a row
+
+### Notes — Story Hook Pins
+- Story plot hooks can be **pinned directly to Pinned Reminders** — click 📌 on any hook in the Stories → Hooks tab
+- Pinned hooks appear with the story name as a clickable link and inline status dropdown
+- Pinning and deleting pins are **undoable** (Ctrl+Z)
 
 ### Notes — Reminders
 - Completed reminders now show a **green highlight** instead of strikethrough text
-- Notes state (pins, hook pins) is now fully included in the undo history
+- Notes state (pins, hook pins) is fully included in the undo history
 
 ### Characters Tab
 - Player cards are now **horizontal** — smaller and more compact, showing avatar, name, class, and level in a row
 
-### Tabs — State Preserved
-- Switching tabs no longer clears in-progress form text — pinned reminders, story hooks, and other forms retain their content when you navigate away and back
+### Bug Fixes
+- Editing a story, character, faction, or location no longer removes hooks or other data that was added after the edit form was first opened (form now merges on save instead of overwriting)
+- Switching tabs preserves in-progress form text — pinned reminders, story hooks, and other forms retain their content when navigating away and back
 
 ### Global Search
 - Added ✕ close button to the search bar so it can be closed with the mouse

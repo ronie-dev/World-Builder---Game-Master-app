@@ -250,7 +250,7 @@ function LootTab({ story, onUpdateStory, artifacts, onUpdateArtifacts, chars, on
   );
 }
 
-function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds }) {
+function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onCancelNew, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds, isEditing, onSetEditing }) {
   const storyStatusList = storyStatuses || DEFAULT_STORY_STATUSES;
   const storyColorMap = Object.fromEntries(storyStatusList.map(s => [s.name, s.color]));
   const [eventModal, setEventModal] = useState(null);
@@ -259,19 +259,18 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
   const setSubTab = onSubTabChange ?? setSubTabInternal;
   const [sideOpen, setSideOpen] = useState(false);
   const [playerPicker, setPlayerPicker] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({...story});
 
-  useEffect(() => { setIsEditing(false); setEditForm({...story}); }, [story?.id]);
+  useEffect(() => { setEditForm({...story}); }, [story?.id]); // eslint-disable-line
   useEffect(() => { if (highlightEventId) setSubTab("timeline"); }, [highlightEventId]);
 
   if (!story) return null;
 
   const set = (k, v) => setEditForm(f => ({...f, [k]:v}));
-  const handleSave = () => { onUpdateStory(editForm); setIsEditing(false); };
-  const handleCancelEdit = () => { setIsEditing(false); setEditForm({...story}); };
+  const handleSave = () => { const {_isNew, ...clean} = {...story, ...editForm}; onUpdateStory(clean); onSetEditing(false); };
+  const handleCancelEdit = () => { if (story._isNew) { onCancelNew?.(story.id); return; } onSetEditing(false); setEditForm({...story}); };
 
-  const linkedChars = chars.filter(c=>story.characterIds.includes(c.id));
+  const linkedChars = chars.filter(c=>(story.characterIds||[]).includes(c.id));
   const events = story.events||[];
 
   const saveEvent = form => {
@@ -320,8 +319,8 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
             </div>
             <div style={{ display:"flex", gap:8, flexShrink:0 }}>
               <button onClick={handleSave} disabled={!editForm.name.trim()} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>💾 Save</button>
-              <button onClick={handleCancelEdit} style={{...btnSecondary,fontSize:12,padding:"6px 14px"}}>Cancel</button>
-              <button onClick={onClose} style={{...btnSecondary,fontSize:18,padding:"2px 10px",lineHeight:1}}>×</button>
+              <button onClick={handleCancelEdit} style={{...btnSecondary,fontSize:12,padding:"6px 14px"}}>{story._isNew ? "Discard" : "Cancel"}</button>
+              {!story._isNew && <button onClick={onClose} style={{...btnSecondary,fontSize:18,padding:"2px 10px",lineHeight:1}}>×</button>}
             </div>
           </>
         ) : (
@@ -331,7 +330,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
               <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", justifyContent:"flex-end" }}>
                 {story.status&&<Badge label={story.status} color={storyColorMap[story.status]||STATUS_COLORS[story.status]}/>}
                 {story.isMain&&<span style={{ fontSize:13, color:"#c8a96e" }}>⭐ Main Story</span>}
-                <button onClick={()=>setIsEditing(true)} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>✏️ Edit</button>
+                <button onClick={()=>onSetEditing(true)} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>✏️ Edit</button>
                 {onSetMain&&<button onClick={()=>onSetMain(story.id)} style={{...btnSecondary,fontSize:12,padding:"6px 14px",borderColor:story.isMain?"#c8a96e":"#3a2a5a",color:story.isMain?"#c8a96e":"#9a7fa0"}}>{story.isMain?"⭐ Main":"☆ Set Main"}</button>}
                 {onSetPlayerStory&&<button onClick={()=>setPlayerPicker(true)} style={{...btnSecondary,fontSize:12,padding:"6px 14px",borderColor:story.playerId?"#7c5cbf":"#3a2a5a",color:story.playerId?"#c8a96e":"#9a7fa0"}}>🎲 {story.playerId ? (chars.find(c=>c.id===story.playerId)?.name||"Player") : "Set Player Story"}</button>}
                 {onDelete&&<button onClick={()=>onDelete(story.id)} style={{...btnSecondary,fontSize:12,padding:"6px 14px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️ Delete</button>}
@@ -377,7 +376,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
           </div>
           <div style={{ display:"flex", gap:10 }}>
             <button onClick={handleSave} disabled={!editForm.name.trim()} style={{...btnPrimary,flex:1}}>💾 Save Story</button>
-            <button onClick={handleCancelEdit} style={{...btnSecondary,flex:1}}>Cancel</button>
+            <button onClick={handleCancelEdit} style={{...btnSecondary,flex:1}}>{story._isNew ? "Discard" : "Cancel"}</button>
           </div>
         </div>
       ) : (
