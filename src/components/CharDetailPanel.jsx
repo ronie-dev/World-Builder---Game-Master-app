@@ -9,6 +9,111 @@ import FilesPanel from "./FilesPanel.jsx";
 import RelationshipLinker from "./RelationshipLinker.jsx";
 import Lightbox from "./Lightbox.jsx";
 
+// ── Faction Role Row ───────────────────────────────────────────────────────────
+function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFaction }) {
+  const [addingRole, setAddingRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [factionSearch, setFactionSearch] = useState("");
+  const [factionOpen, setFactionOpen] = useState(false);
+
+  const faction = allFactions.find(f => f.id === entry.factionId);
+  const tiers = faction?.tiers || [];
+
+  const updateEntries = patch => {
+    const updated = [...entries];
+    updated[i] = { ...entry, ...patch };
+    setEntries(updated);
+  };
+
+  const handleFactionChange = val => {
+    updateEntries({ factionId: val, tierId: "", role: "" });
+    setAddingRole(false);
+    setNewRoleName("");
+    setFactionOpen(false);
+    setFactionSearch("");
+  };
+
+  const handleTierChange = val => {
+    if (val === "__new__") { setAddingRole(true); return; }
+    const tier = tiers.find(t => t.id === val);
+    updateEntries({ tierId: val, role: tier?.name || "" });
+  };
+
+  const confirmNewRole = () => {
+    const n = newRoleName.trim();
+    if (!n || !faction) return;
+    const newTier = { id: uid(), name: n };
+    onSaveFaction({ ...faction, tiers: [...tiers, newTier] });
+    updateEntries({ tierId: newTier.id, role: n });
+    setNewRoleName("");
+    setAddingRole(false);
+  };
+
+  const filteredFactions = allFactions.filter(f =>
+    !factionSearch || f.name.toLowerCase().includes(factionSearch.toLowerCase())
+  );
+
+  return (
+    <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"flex-start" }}>
+      {/* Faction searchable dropdown */}
+      <div style={{ flex:1, position:"relative" }}>
+        <div onClick={()=>setFactionOpen(o=>!o)}
+          style={{ ...selStyle, display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", userSelect:"none" }}>
+          <span style={{ color: faction ? "#e8d5b7" : "#5a4a7a" }}>{faction ? faction.name : "— Select Faction —"}</span>
+          <span style={{ fontSize:10, color:"#5a4a7a" }}>{factionOpen ? "▲" : "▼"}</span>
+        </div>
+        {factionOpen && (
+          <div style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:50, background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, marginTop:2, boxShadow:"0 4px 20px #00000088" }}>
+            <div style={{ padding:"6px 8px", borderBottom:"1px solid #2a1f3d" }}>
+              <input autoFocus value={factionSearch} onChange={e=>setFactionSearch(e.target.value)}
+                placeholder="Search factions…" style={{...inputStyle, fontSize:12, padding:"4px 8px", width:"100%"}}
+                onClick={e=>e.stopPropagation()}/>
+            </div>
+            <div style={{ maxHeight:160, overflowY:"auto" }}>
+              <div onClick={()=>handleFactionChange("")}
+                style={{ padding:"7px 12px", cursor:"pointer", fontSize:13, color:"#5a4a7a", borderBottom:"1px solid #1e1630" }}
+                onMouseEnter={e=>e.currentTarget.style.background="#2a1f3d"}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                — None —
+              </div>
+              {filteredFactions.map(f => (
+                <div key={f.id} onClick={()=>handleFactionChange(f.id)}
+                  style={{ padding:"7px 12px", cursor:"pointer", fontSize:13, color: entry.factionId===f.id?"#c8a96e":"#e8d5b7", background: entry.factionId===f.id?"#2a1f50":"transparent", borderBottom:"1px solid #1e1630" }}
+                  onMouseEnter={e=>{ if(entry.factionId!==f.id) e.currentTarget.style.background="#1e1630"; }}
+                  onMouseLeave={e=>{ if(entry.factionId!==f.id) e.currentTarget.style.background="transparent"; }}>
+                  {f.name}
+                </div>
+              ))}
+              {filteredFactions.length === 0 && <div style={{ padding:"8px 12px", color:"#5a4a7a", fontSize:12 }}>No factions found</div>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Role / tier selector */}
+      {entry.factionId && (
+        addingRole ? (
+          <div style={{ display:"flex", gap:4, flex:"0 0 200px" }}>
+            <input value={newRoleName} onChange={e=>setNewRoleName(e.target.value)}
+              onKeyDown={e=>{ if(e.key==="Enter") confirmNewRole(); if(e.key==="Escape") setAddingRole(false); }}
+              autoFocus placeholder="New role name…" style={{...inputStyle,flex:1,fontSize:12,padding:"4px 8px"}}/>
+            <button onClick={confirmNewRole} style={{...btnPrimary,fontSize:11,padding:"3px 8px"}}>✓</button>
+            <button onClick={()=>{ setAddingRole(false); setNewRoleName(""); }} style={{...btnSecondary,fontSize:11,padding:"3px 6px"}}>✕</button>
+          </div>
+        ) : (
+          <select value={entry.tierId||""} onChange={e=>handleTierChange(e.target.value)} style={{...selStyle,flex:"0 0 160px"}}>
+            <option value="">— Select Role —</option>
+            {tiers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="__new__">➕ New role…</option>
+          </select>
+        )
+      )}
+
+      <button onClick={()=>setEntries(entries.filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
+    </div>
+  );
+}
+
 // ── Char Hooks Tab ─────────────────────────────────────────────────────────────
 const DEFAULT_HOOK_STATUSES = [
   { name:"Potential", color:"#7c5cbf" },
@@ -167,7 +272,7 @@ function CharTimeline({ evGroupMap, evGroupOrder, evUndated, stories, onOpenStor
 }
 
 // ── Items Tab ─────────────────────────────────────────────────────────────────
-function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts }) {
+function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArtifact }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [addingNew, setAddingNew] = useState(false);
@@ -232,17 +337,22 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts }) {
             {artifacts.filter(a => a.holderId === char.id).map(a => {
               const rc = RARITY_COLORS[a.rarity] || "#9a9a9a";
               return (
-                <div key={a.id} style={{ background:"#0f0c1a", border:`1px solid ${rc}33`, borderLeft:`3px solid ${rc}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center" }}>
+                <div key={a.id}
+                  onClick={onOpenArtifact ? ()=>onOpenArtifact(a) : undefined}
+                  style={{ background:"#0f0c1a", border:`1px solid ${rc}33`, borderLeft:`3px solid ${rc}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center", cursor: onOpenArtifact ? "pointer" : "default", transition:"border-color .15s" }}
+                  onMouseEnter={e=>{ if(onOpenArtifact) e.currentTarget.style.borderColor=rc+"88"; }}
+                  onMouseLeave={e=>{ if(onOpenArtifact) e.currentTarget.style.borderColor=rc+"33"; }}>
                   {a.image && <img src={a.image} alt="" style={{ width:40, height:40, borderRadius:6, objectFit:"cover", flexShrink:0 }}/>}
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
                       <span style={{ fontSize:13, color:"#e8d5b7", fontWeight:700 }}>{a.name}</span>
                       <span style={{ fontSize:9, color:rc, background:rc+"22", border:`1px solid ${rc}44`, borderRadius:8, padding:"1px 6px" }}>{a.rarity}</span>
+                      {onOpenArtifact && <span style={{ fontSize:10, color:"#7c5cbf", opacity:.7 }}>↗ Items</span>}
                     </div>
                     {a.description && <div style={{ fontSize:12, color:"#b09080" }}>{a.description}</div>}
                   </div>
                   {a.value && <span style={{ fontSize:12, color:"#c8a96e", fontWeight:700, flexShrink:0 }}>🪙 {a.value}</span>}
-                  <button onClick={() => onUpdateArtifacts(artifacts.map(x => x.id===a.id ? {...x, holderId:null} : x))}
+                  <button onClick={e=>{ e.stopPropagation(); onUpdateArtifacts(artifacts.map(x => x.id===a.id ? {...x, holderId:null} : x)); }}
                     style={{...btnSecondary, fontSize:11, padding:"3px 8px", flexShrink:0}}>Unassign</button>
                 </div>
               );
@@ -293,7 +403,7 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts }) {
   );
 }
 
-function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, artifacts, onUpdateArtifacts, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, isEditing, onSetEditing }) {
+function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, isEditing, onSetEditing }) {
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;
   const setSubTab = onSubTabChange ?? setSubTabInternal;
@@ -365,11 +475,13 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
                 <span style={{ fontSize:22, fontFamily:"Georgia,serif", color:"#e8d5b7", fontWeight:700 }}>{char.name}</span>
                 <span style={{ fontSize:12, color:"#7c5cbf", background:"#7c5cbf22", borderRadius:4, padding:"2px 8px" }}>{isPlayer?"🎲 Player":char.type==="main"?"⭐ Main":"👤 Side"}</span>
               </div>
-              {raceLabel&&<div style={{ color:"#9a7fa0", fontSize:13, marginTop:4, display:"flex", alignItems:"center", gap:4 }}>{raceIcon ? <img src={raceIcon} alt="" style={{ width:14, height:14, objectFit:"cover", borderRadius:2 }}/> : "🧬"} {raceLabel}</div>}
-              {isPlayer&&<div style={{ display:"flex", gap:16, marginTop:4 }}>
-                {char.class&&<div style={{ color:"#9a7fa0", fontSize:13 }}>⚔️ {char.class}</div>}
-                {char.level&&<div style={{ color:"#c8a96e", fontSize:13, fontWeight:700 }}>Lvl {char.level}</div>}
-              </div>}
+              <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:4, flexWrap:"wrap" }}>
+                {raceLabel&&<div style={{ color:"#9a7fa0", fontSize:13, display:"flex", alignItems:"center", gap:4 }}>{raceIcon ? <img src={raceIcon} alt="" style={{ width:14, height:14, objectFit:"cover", borderRadius:2 }}/> : "🧬"} {raceLabel}</div>}
+                {locationName&&<div style={{ color:"#9a7fa0", fontSize:13 }}>📍 {locationName}</div>}
+                {isPlayer&&char.class&&<div style={{ color:"#9a7fa0", fontSize:13 }}>⚔️ {char.class}</div>}
+                {isPlayer&&char.level&&<div style={{ color:"#c8a96e", fontSize:13, fontWeight:700 }}>Lvl {char.level}</div>}
+              </div>
+              {char.shortDescription&&<div style={{ color:"#8a7090", fontSize:13, marginTop:5, fontStyle:"italic" }}>{char.shortDescription}</div>}
             </div>
           </>
         )}
@@ -464,16 +576,13 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
           <div style={{ marginBottom:14 }}>
             <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:8, letterSpacing:1, textTransform:"uppercase" }}>Factions</label>
             {(editForm.factions||[]).map((entry,i)=>(
-              <div key={entry.id} style={{ display:"flex", gap:8, marginBottom:8 }}>
-                <select value={entry.factionId} onChange={e=>{ const f=[...(editForm.factions||[])]; f[i]={...f[i],factionId:e.target.value}; set("factions",f); }} style={{...selStyle,flex:1}}>
-                  <option value="">— Select Faction —</option>
-                  {factions.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
-                <input value={entry.role} onChange={e=>{ const f=[...(editForm.factions||[])]; f[i]={...f[i],role:e.target.value}; set("factions",f); }} placeholder="Role (e.g. Leader)" style={{...inputStyle,flex:"0 0 150px"}}/>
-                <button onClick={()=>set("factions",(editForm.factions||[]).filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
-              </div>
+              <FactionRoleRow key={entry.id} entry={entry} i={i}
+                allFactions={factions}
+                entries={editForm.factions||[]}
+                setEntries={v=>set("factions",v)}
+                onSaveFaction={onSaveFaction}/>
             ))}
-            <button onClick={()=>set("factions",[...(editForm.factions||[]),{id:uid(),factionId:"",role:""}])} style={{...btnSecondary,fontSize:12,padding:"5px 14px"}}>+ Add Faction</button>
+            <button onClick={()=>set("factions",[...(editForm.factions||[]),{id:uid(),factionId:"",tierId:"",role:""}])} style={{...btnSecondary,fontSize:12,padding:"5px 14px"}}>+ Add Faction</button>
           </div>
           {/* Biography / Custom Text Tabs */}
           <div style={{ marginBottom:14 }}>
@@ -565,13 +674,13 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             <button onClick={()=>setSubTab("hooks")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="hooks"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="hooks"?700:400, borderBottom:subTab==="hooks"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
               🔮 Hooks{(char.hooks||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.hooks||[]).length}</span>}
             </button>
-            {isPlayer&&<button onClick={()=>setSubTab("files")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="files"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="files"?700:400, borderBottom:subTab==="files"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
+            <button onClick={()=>setSubTab("files")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="files"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="files"?700:400, borderBottom:subTab==="files"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
               📁 Files{(char.files||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.files||[]).length}</span>}
-            </button>}
+            </button>
           </div>
           {subTab==="details"&&(
             <div style={{ display:"flex", flexWrap:"wrap" }}>
-              {(isPlayer?char.origin:locationName)&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>📍 {isPlayer?"Origin":"Location"}</div><div style={{ color:"#c8b89a", fontSize:14 }}>{isPlayer?char.origin:locationName}</div></div>}
+              {isPlayer&&char.origin&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>📍 Origin</div><div style={{ color:"#c8b89a", fontSize:14 }}>{char.origin}</div></div>}
               {char.status&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>💀 Status</div><div style={{ display:"inline-block", background:(charStatuses||[]).find(s=>s.name===char.status)?.color||CHAR_STATUS_COLORS[char.status]||"#4a4a6a", color:"#e8d5b7", borderRadius:4, padding:"2px 10px", fontSize:13, fontWeight:700 }}>{char.status}</div></div>}
               {(char.description||(char.textTabs||[]).length>0)&&(()=>{
                 const allTextTabs = [{id:"biography",name:isPlayer?"Biography":"Description",content:char.description||""}, ...(char.textTabs||[])];
@@ -672,7 +781,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
               )}
             </div>
           )}
-          {subTab==="items"&&<ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts}/>}
+          {subTab==="items"&&<ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}/>}
           {subTab==="timeline"&&(
             <div style={{ padding:"20px 24px" }}>
               {charEvents.length===0 ? (
@@ -686,7 +795,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             </div>
           )}
           {subTab==="hooks"&&<CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds}/>}
-          {isPlayer&&subTab==="files"&&onUpdateChar&&<FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
+          {subTab==="files"&&onUpdateChar&&<FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
         </>
       )}
       <Lightbox src={lightbox} onClose={()=>setLightbox(null)}/>

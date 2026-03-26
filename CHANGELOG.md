@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.4.2.1 — Character Details, Gallery & QoL Improvements
+
+### Characters — Header Redesign
+- **Race** and **Location** now displayed in the character detail header (next to each other), removed from the Details grid
+- **Short Description** shown below Race/Location in the header in italic — visible in view mode without opening the edit form
+
+### Characters — Files Tab for All Types
+- The **📁 Files** tab is now available for all character types (Main, Side, and Player) — previously only Player characters had it
+
+### Characters — Faction Role Sync
+- Faction roles on the character sheet are now a **dropdown** showing tiers defined in the faction itself — no more free-text mismatch
+- Creating a new tier from the character sheet immediately adds it to the faction's Members tab (synced both ways)
+- Faction dropdown in character edit form now has an **inline search field** for quick filtering
+
+### Characters — Items Tab Artifact Link
+- Artifact cards in the character's Items tab are now **clickable** — clicking jumps directly to the artifact in the Items & Artifacts tab (↗ Items label shown)
+
+### Stories — Sort by Status Order
+- Stories list is now automatically sorted by the **status order defined in Settings** — drag/reorder statuses in Settings to control the sort order
+
+### Settings — Status Reorder
+- Status lists in Settings (Story Statuses, Hook Statuses, etc.) now have **▲/▼ arrows** on each row to reorder them; the new order is used for story sorting
+
+### Gallery Tab
+- New **🖼️ Gallery** tab in the sidebar — browse all images from characters, stories, artifacts, and lore events in one masonry grid
+- Filter by type: Characters, Stories, Artifacts, Lore, or All
+- **Direct upload**: add custom images to the gallery, assign a name and category; custom entries persist in the campaign save
+- Click any image to open a full lightbox; custom gallery entries can be deleted (with confirmation)
+
+### Items & Artifacts — Story Search
+- Added a **search field** above the linked stories list in the artifact edit panel — quickly filter stories by name when linking
+
+---
+
 ## v0.4.2 — Inline Factions, Timeline Quick-Jump & Crash Fix
 
 ### Factions — Inline Creation & Editing

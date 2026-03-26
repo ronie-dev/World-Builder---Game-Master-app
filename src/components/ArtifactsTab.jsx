@@ -49,6 +49,7 @@ function HolderPicker({ chars, holderId, onChange }) {
 function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClose, onCancelNew, isEditing, onSetEditing, onOpenChar, onOpenStory }) {
   const [form, setForm] = useState({ ...defaultArtifact, ...artifact });
   const [imgOpen, setImgOpen] = useState(false);
+  const [storySearch, setStorySearch] = useState("");
 
   useEffect(() => { setForm({ ...defaultArtifact, ...artifact }); }, [artifact?.id]); // eslint-disable-line
 
@@ -172,8 +173,12 @@ function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClo
           {stories.length > 0 && (
             <div style={{ marginBottom:20 }}>
               <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:6, letterSpacing:1, textTransform:"uppercase" }}>Linked Stories</label>
-              <div style={{ display:"flex", flexDirection:"column", gap:4, maxHeight:140, overflowY:"auto" }}>
-                {stories.map(s => {
+              <div style={{ position:"relative", marginBottom:6 }}>
+                <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:12 }}>🔍</span>
+                <input value={storySearch} onChange={e=>setStorySearch(e.target.value)} placeholder="Search stories…" style={{...inputStyle, paddingLeft:30, fontSize:12, padding:"6px 8px 6px 30px"}}/>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:4, maxHeight:160, overflowY:"auto" }}>
+                {stories.filter(s => !storySearch || s.name.toLowerCase().includes(storySearch.toLowerCase())).map(s => {
                   const checked = (form.storyIds||[]).includes(s.id);
                   return (
                     <div key={s.id} onClick={() => toggleStory(s.id)}
@@ -185,6 +190,9 @@ function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClo
                     </div>
                   );
                 })}
+                {stories.filter(s => !storySearch || s.name.toLowerCase().includes(storySearch.toLowerCase())).length === 0 && (
+                  <div style={{ padding:"8px 10px", color:"#5a4a7a", fontSize:12 }}>No stories match "{storySearch}"</div>
+                )}
               </div>
             </div>
           )}

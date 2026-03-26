@@ -14,8 +14,8 @@ function CharactersTabContent({
   charSubTab, mainCollapsed, sideCollapsed,
   updPg,
   onNewChar, onDeleteChar, onCancelNew,
-  onOpenStory, onOpenFaction, onOpenChar,
-  onSaveChar, onUpdateArtifacts,
+  onOpenStory, onOpenFaction, onOpenChar, onOpenArtifact,
+  onSaveChar, onSaveFaction, onUpdateArtifacts,
   onPinCharHook, pinnedCharHookIds,
   isEditing, onSetEditing,
 }) {
@@ -84,8 +84,8 @@ function CharactersTabContent({
                 onClose={()=>updPg({ selectedCharId: null })}
                 onDelete={onDeleteChar} onCancelNew={onCancelNew} onOpenStory={onOpenStory}
                 onOpenFaction={onOpenFaction} onOpenChar={onOpenChar}
-                onUpdateChar={onSaveChar} artifacts={artifacts}
-                onUpdateArtifacts={onUpdateArtifacts}
+                onUpdateChar={onSaveChar} onSaveFaction={onSaveFaction} artifacts={artifacts}
+                onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}
                 onPinCharHook={onPinCharHook} pinnedCharHookIds={pinnedCharHookIds}
                 subTab={charSubTab} onSubTabChange={v=>updPg({ charSubTab: v })}
                 isEditing={isEditing} onSetEditing={onSetEditing}/>

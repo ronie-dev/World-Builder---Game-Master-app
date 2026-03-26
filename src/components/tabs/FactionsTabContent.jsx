@@ -38,7 +38,7 @@ function FactionsTabContent({
   factions, chars,
   selectedFaction, selectedFactionId,
   updPg,
-  onNewFaction, onCancelNew, onSaveFaction, onDeleteFaction, onOpenChar,
+  onNewFaction, onCancelNew, onSaveFaction, onDeleteFaction, onOpenChar, onSaveChar,
   isEditing, onSetEditing,
 }) {
   return (
@@ -63,7 +63,7 @@ function FactionsTabContent({
           {selectedFaction
             ? <FactionDetailPanel faction={selectedFaction} factions={factions} chars={chars}
                 onClose={()=>updPg({ selectedFactionId: null })} onSave={onSaveFaction}
-                onDelete={onDeleteFaction} onOpenChar={onOpenChar}
+                onDelete={onDeleteFaction} onOpenChar={onOpenChar} onSaveChar={onSaveChar}
                 onCancelNew={onCancelNew}
                 isEditing={isEditing} onSetEditing={onSetEditing}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>

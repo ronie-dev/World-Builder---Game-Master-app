@@ -5,7 +5,7 @@ import Avatar from "./Avatar.jsx";
 import Badge from "./Badge.jsx";
 
 // ── Structure Tab ─────────────────────────────────────────────────────────────
-function StructureTab({ faction, allMembers, onSave, onOpenChar }) {
+function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
   const tiers = faction.tiers || [{ id:"__default__", name:"Members" }];
   const [draggedCharId, setDraggedCharId] = useState(null);
   const [dragOverTier, setDragOverTier] = useState(null);
@@ -23,14 +23,23 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar }) {
 
   const updateTiers = newTiers => onSave({ ...faction, tiers: newTiers });
   const moveMember = (charId, tierId) => {
-    // Update tierId in the char's faction membership — persisted via onSave on faction
-    // We store tierId on the faction's memberAssignments map for simplicity
     const assignments = { ...(faction.structureAssignments||{}) };
     assignments[charId] = tierId;
     onSave({ ...faction, tiers, structureAssignments: assignments });
+    // Sync tierId + role back to the character
+    if (onSaveChar) {
+      const c = allMembers.find(m => m.id === charId);
+      if (c) {
+        const tier = tiers.find(t => t.id === tierId);
+        const updated = { ...c, factions: (c.factions||[]).map(e => e.factionId===faction.id ? {...e, tierId, role: tier?.name||e.role} : e) };
+        onSaveChar(updated);
+      }
+    }
   };
 
   const getAssignedTierId = c => {
+    const membership = (c.factions||[]).find(e=>e.factionId===faction.id);
+    if (membership?.tierId && tiers.some(t=>t.id===membership.tierId)) return membership.tierId;
     if (faction.structureAssignments?.[c.id]) return faction.structureAssignments[c.id];
     return tiers[tiers.length-1]?.id || "__default__";
   };
@@ -130,7 +139,8 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar }) {
                   <div key={c.id} draggable
                     onDragStart={()=>setDraggedCharId(c.id)}
                     onDragEnd={()=>{ setDraggedCharId(null); setDragOverTier(null); }}
-                    onClick={e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);}}} onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenChar(c,{newTab:true});}}}
+                    onClick={e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);}}}
+                    onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenChar(c,{newTab:true});}}}
                     style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1630", border:"1px solid #3a2a5a", borderRadius:8, padding:"6px 12px 6px 6px", cursor:"grab", userSelect:"none", transition:"border-color .15s, opacity .15s", opacity: draggedCharId===c.id ? 0.4 : 1 }}
                     onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
                     onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>
@@ -149,7 +159,7 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar }) {
   );
 }
 
-function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelete, onOpenChar, onCancelNew, isEditing, onSetEditing }) {
+function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelete, onOpenChar, onSaveChar, onCancelNew, isEditing, onSetEditing }) {
   const [editForm, setEditForm] = useState({ ...defaultFaction, ...faction });
   const [detailTab, setDetailTab] = useState("members");
   const colorRef = useRef();
@@ -263,7 +273,7 @@ function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelet
             </div>
           )}
           {detailTab === "members" && (
-            <StructureTab faction={faction} allMembers={allMembers} onSave={onSave} onOpenChar={onOpenChar}/>
+            <StructureTab faction={faction} allMembers={allMembers} onSave={onSave} onOpenChar={onOpenChar} onSaveChar={onSaveChar}/>
           )}
         </div>
       )}
