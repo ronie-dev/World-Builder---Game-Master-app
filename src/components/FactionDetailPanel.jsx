@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, memo } from "react";
-import { inputStyle, selStyle, btnPrimary, btnSecondary, iconBtn, ALIGNMENT_COLORS, FACTION_STATUS_COLORS, ALIGNMENTS, FACTION_STATUSES, FACTION_COLORS, defaultFaction } from "../constants.js";
+import { inputStyle, ghostInput, ghostTextarea, selStyle, btnPrimary, btnSecondary, iconBtn, ALIGNMENT_COLORS, FACTION_STATUS_COLORS, ALIGNMENTS, FACTION_STATUSES, FACTION_COLORS } from "../constants.js";
 import { getFactionColor, uid } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
-import Badge from "./Badge.jsx";
+import PortraitZone from "./PortraitZone.jsx";
 
 // ── Structure Tab ─────────────────────────────────────────────────────────────
-function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
+function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveChar }) {
   const tiers = faction.tiers || [{ id:"__default__", name:"Members" }];
   const [draggedCharId, setDraggedCharId] = useState(null);
   const [dragOverTier, setDragOverTier] = useState(null);
@@ -15,11 +15,8 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
   const [newTierName, setNewTierName] = useState("");
   const [addingTier, setAddingTier] = useState(false);
   const [confirmDeleteTierId, setConfirmDeleteTierId] = useState(null);
-
-  const getTierId = c => {
-    const membership = (c.factions||[]).find(e=>e.factionId===faction.id);
-    return membership?.tierId || tiers[tiers.length-1]?.id || "__default__";
-  };
+  const [addingToTierId, setAddingToTierId] = useState(null);
+  const [addSearch, setAddSearch] = useState("");
 
   const updateTiers = newTiers => onSave({ ...faction, tiers: newTiers });
   const moveMember = (charId, tierId) => {
@@ -72,6 +69,27 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
     Object.keys(assignments).forEach(cid => { if (assignments[cid]===id) assignments[cid]=fallback; });
     onSave({ ...faction, tiers: tiers.filter(t=>t.id!==id), structureAssignments: assignments });
     setConfirmDeleteTierId(null);
+  };
+
+  const removeMember = (charId) => {
+    const c = allMembers.find(m => m.id === charId);
+    if (c && onSaveChar) {
+      onSaveChar({ ...c, factions: (c.factions||[]).filter(e => e.factionId !== faction.id) });
+    }
+    const assignments = { ...(faction.structureAssignments||{}) };
+    delete assignments[charId];
+    onSave({ ...faction, tiers, structureAssignments: assignments });
+  };
+
+  const addMember = (char, tierId) => {
+    const tier = tiers.find(t => t.id === tierId);
+    // Link char to faction
+    const updatedChar = { ...char, factions: [...(char.factions||[]).filter(e=>e.factionId!==faction.id), { factionId: faction.id, role: tier?.name||"", tierId }] };
+    onSaveChar(updatedChar);
+    // Assign to tier
+    const assignments = { ...(faction.structureAssignments||{}), [char.id]: tierId };
+    onSave({ ...faction, tiers, structureAssignments: assignments });
+    setAddingToTierId(null); setAddSearch("");
   };
 
   return (
@@ -129,12 +147,12 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
                 )}
               </div>
               {/* Drop zone + member cards */}
-              <div style={{ display:"flex", flexWrap:"wrap", gap:8, minHeight:44, padding:"4px 0 8px", background: isOver ? "#7c5cbf0a" : "transparent", borderRadius:6, transition:"background .15s" }}
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8, minHeight:44, padding:"4px 0 8px", background: isOver ? "#7c5cbf0a" : "transparent", borderRadius:6, transition:"background .15s", alignItems:"center" }}
                 onDragOver={e=>{ e.preventDefault(); setDragOverTier(tier.id); }}
                 onDragLeave={()=>setDragOverTier(null)}
                 onDrop={e=>{ e.preventDefault(); if(draggedCharId) moveMember(draggedCharId, tier.id); setDraggedCharId(null); setDragOverTier(null); }}>
-                {tierMembers.length === 0 && !isOver && <span style={{ color:"#3a2a5a", fontSize:12, alignSelf:"center" }}>— empty —</span>}
-                {isOver && tierMembers.length === 0 && <span style={{ color:"#7c5cbf", fontSize:12, alignSelf:"center" }}>Drop here</span>}
+                {tierMembers.length === 0 && !isOver && addingToTierId !== tier.id && <span style={{ color:"#3a2a5a", fontSize:12 }}>— empty —</span>}
+                {isOver && tierMembers.length === 0 && <span style={{ color:"#7c5cbf", fontSize:12 }}>Drop here</span>}
                 {tierMembers.map(c => (
                   <div key={c.id} draggable
                     onDragStart={()=>setDraggedCharId(c.id)}
@@ -148,8 +166,45 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
                     <Avatar src={c.image} name={c.name} size={28}/>
                     <span style={{ fontSize:12, color:"#e8d5b7", fontWeight:600 }}>{c.name}</span>
                     <span style={{ fontSize:10, color:"#7c5cbf", opacity:.7 }}>↗</span>
+                    <button onClick={e=>{ e.stopPropagation(); removeMember(c.id); }}
+                      style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:14, padding:"0 2px", lineHeight:1, marginLeft:2, flexShrink:0 }}
+                      onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
                   </div>
                 ))}
+                {/* Add character box */}
+                {addingToTierId === tier.id ? (
+                  <div style={{ position:"relative" }}>
+                    <input autoFocus value={addSearch} onChange={e=>setAddSearch(e.target.value)}
+                      onKeyDown={e=>{ if(e.key==="Escape"){ setAddingToTierId(null); setAddSearch(""); } }}
+                      placeholder="Search character…"
+                      style={{...inputStyle, fontSize:12, padding:"5px 10px", width:160}}/>
+                    {(() => {
+                      const q = addSearch.toLowerCase();
+                      const results = (chars||[]).filter(c => !allMembers.some(m=>m.id===c.id) && (!q || c.name.toLowerCase().includes(q)));
+                      if (!results.length) return null;
+                      return (
+                        <div style={{ position:"absolute", top:"100%", left:0, zIndex:20, background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, width:200, maxHeight:180, overflowY:"auto", marginTop:4, boxShadow:"0 4px 16px #00000066" }}>
+                          {results.map(c => (
+                            <div key={c.id} onMouseDown={e=>{ e.preventDefault(); addMember(c, tier.id); }}
+                              style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 10px", cursor:"pointer", borderBottom:"1px solid #1e1630" }}
+                              onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                              <Avatar src={c.image} name={c.name} size={22}/>
+                              <span style={{ fontSize:12, color:"#e8d5b7", flex:1 }}>{c.name}</span>
+                              <span style={{ fontSize:10, color:"#7c5cbf" }}>+ Add</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div onClick={()=>{ setAddingToTierId(tier.id); setAddSearch(""); }}
+                    style={{ display:"flex", alignItems:"center", justifyContent:"center", width:44, height:44, border:"2px dashed #3a2a5a", borderRadius:8, cursor:"pointer", color:"#3a2a5a", fontSize:20, flexShrink:0, transition:"border-color .15s, color .15s" }}
+                    onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#7c5cbf"; }}
+                    onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#3a2a5a"; }}>
+                    +
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -159,124 +214,233 @@ function StructureTab({ faction, allMembers, onSave, onOpenChar, onSaveChar }) {
   );
 }
 
-function FactionDetailPanel({ faction, factions, chars, onClose, onSave, onDelete, onOpenChar, onSaveChar, onCancelNew, isEditing, onSetEditing }) {
-  const [editForm, setEditForm] = useState({ ...defaultFaction, ...faction });
-  const [detailTab, setDetailTab] = useState("members");
-  const colorRef = useRef();
+function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSave, onDelete, onOpenChar, onSaveChar, onCancelNew }) {
+  const colorTimerRef = useRef(null);
+  const [colorDraft, setColorDraft] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+  const [fieldVal, setFieldVal] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showColors, setShowColors] = useState(false);
+  const [activeTextTab, setActiveTextTab] = useState("description");
+  const [renamingTabId, setRenamingTabId] = useState(null);
+  const [renameVal, setRenameVal] = useState("");
+  const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
 
-  useEffect(() => { setEditForm({ ...defaultFaction, ...faction }); }, [faction?.id]); // eslint-disable-line
+  useEffect(() => {
+    setEditingField(null); setFieldVal(""); setConfirmDelete(false);
+  }, [faction?.id]); // eslint-disable-line
+
+  useEffect(() => {
+    const handler = e => {
+      if (e.key !== "Escape") return;
+      if (editingField !== null) { setEditingField(null); return; }
+      if (confirmDelete) { setConfirmDelete(false); return; }
+      if (faction?._isNew) { onCancelNew?.(faction.id); return; }
+      onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [editingField, confirmDelete]); // eslint-disable-line
 
   if (!faction) return null;
 
-  const set = (k, v) => setEditForm(f => ({ ...f, [k]: v }));
-  const handleSave = () => { const {_isNew, ...clean} = {...faction, ...editForm}; onSave(clean); onSetEditing(false); };
-  const handleCancelEdit = () => { if (faction._isNew) { onCancelNew?.(faction.id); return; } onSetEditing(false); setEditForm({ ...defaultFaction, ...faction }); };
+  const commit = (field, val) => { onSave({...faction, [field]: val}); setEditingField(null); };
+  const startEdit = (field, val) => { setEditingField(field); setFieldVal(val||""); };
+  const fh = {
+    onMouseEnter: e => e.currentTarget.style.background = "#ffffff0a",
+    onMouseLeave: e => e.currentTarget.style.background = "transparent",
+  };
+  const allTextTabs = [{ id:"description", name:"Description", content:faction.description||"" }, ...(faction.textTabs||[])];
+  const activeTabContent = allTextTabs.find(t => t.id === activeTextTab)?.content || "";
+  const updateTextTab = (tabId, content) => {
+    if (tabId === "description") onSave({...faction, description: content});
+    else onSave({...faction, textTabs:(faction.textTabs||[]).map(t => t.id===tabId ? {...t,content} : t)});
+  };
+  const addTextTab = () => { const id=uid(); onSave({...faction, textTabs:[...(faction.textTabs||[]),{id,name:"New Tab",content:""}]}); setActiveTextTab(id); setRenamingTabId(id); setRenameVal("New Tab"); };
+  const renameTab = (tabId, name) => { onSave({...faction, textTabs:(faction.textTabs||[]).map(t => t.id===tabId?{...t,name:name.trim()||t.name}:t)}); setRenamingTabId(null); };
+  const deleteTab = tabId => { if(activeTextTab===tabId) setActiveTextTab("description"); onSave({...faction, textTabs:(faction.textTabs||[]).filter(t=>t.id!==tabId)}); setConfirmDeleteTabId(null); };
 
   const allMembers = chars.filter(c => (c.factions || []).some(e => e.factionId === faction.id));
   const color = getFactionColor(factions, faction.id);
 
   return (
-    <div style={{ background:"#13101f", border:"1px solid #7c5cbf", borderRadius:12, marginBottom:20, overflow:"hidden", boxShadow:"0 4px 32px #7c5cbf22", animation:"slideDown .18s ease" }}>
+    <div style={{ background:"#13101f", border:"1px solid #7c5cbf", borderRadius:12, marginBottom:20, overflow:"visible", boxShadow:"0 4px 32px #7c5cbf22", animation:"slideDown .18s ease" }}>
       <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}`}</style>
-      <div style={{ background:`linear-gradient(90deg,${color}aa,#13101f)`, padding:"18px 24px", display:"flex", alignItems:"flex-start", gap:20, borderBottom:"1px solid #2a1f3d" }}>
+
+      {/* ── Sticky header ── */}
+      <div style={{ position:"sticky", top:0, zIndex:20, borderRadius:"12px 12px 0 0" }}>
+      <div style={{ background:`linear-gradient(90deg,#13101f,${color}aa)`, padding:"18px 24px", display:"flex", alignItems:"flex-start", gap:16, borderBottom:"1px solid #2a1f3d", borderRadius:"12px 12px 0 0" }}>
+
+        {/* Portrait */}
+        <PortraitZone value={faction.image} onChange={src=>onSave({...faction,image:src})} size={72} emptyIcon="🏴" emptyLabel="Add logo"/>
+
+        {/* Left: name + badges + location */}
         <div style={{ flex:1 }}>
-          {isEditing ? (
-            <input value={editForm.name} onChange={e => set("name", e.target.value)} placeholder="Faction name…"
-              style={{ ...inputStyle, fontSize:18, fontFamily:"Georgia,serif", fontWeight:700 }}/>
-          ) : (
-            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:6 }}>
-              <span style={{ fontSize:22, fontFamily:"Georgia,serif", color:"#e8d5b7", fontWeight:700 }}>⚑ {faction.name}</span>
-              {faction.alignment && <Badge label={faction.alignment} color={ALIGNMENT_COLORS[faction.alignment]}/>}
-              {faction.status && <Badge label={faction.status} color={FACTION_STATUS_COLORS[faction.status] || "#3a3a3a"}/>}
+          {/* Name */}
+          {editingField==="name"
+            ? <input value={fieldVal} autoFocus
+                onChange={e=>setFieldVal(e.target.value)}
+                onBlur={()=>{ if(fieldVal.trim()) commit("name",fieldVal.trim()); else setEditingField(null); }}
+                onKeyDown={e=>{ if(e.key==="Enter"&&fieldVal.trim()) commit("name",fieldVal.trim()); if(e.key==="Tab"){ e.preventDefault(); if(fieldVal.trim()) commit("name",fieldVal.trim()); startEdit("locationId",""); } if(e.key==="Escape") setEditingField(null); }}
+                style={{...inputStyle, fontSize:18, fontFamily:"Georgia,serif", fontWeight:700, marginBottom:6, display:"block", width:"100%", boxSizing:"border-box"}}/>
+            : <div onClick={()=>startEdit("name",faction.name||"")} {...fh} style={{ borderRadius:4, cursor:"text", marginBottom:6, display:"inline-block" }}>
+                <span style={{ fontSize:22, fontFamily:"Georgia,serif", color:"#e8d5b7", fontWeight:700 }}>⚑ {faction.name||<span style={{color:"#3a2a5a",fontStyle:"italic"}}>Unnamed Faction</span>}</span>
+              </div>
+          }
+          {/* Alignment + Status */}
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:6 }}>
+            {editingField==="alignment"
+              ? <select value={fieldVal} autoFocus onChange={e=>commit("alignment",e.target.value)} onBlur={()=>setEditingField(null)} onKeyDown={e=>{ if(e.key==="Escape") setEditingField(null); }} style={{...selStyle,fontSize:12,padding:"3px 8px"}}>
+                  <option value="">— None —</option>
+                  {ALIGNMENTS.map(a=><option key={a}>{a}</option>)}
+                </select>
+              : <div onClick={()=>startEdit("alignment",faction.alignment||"")} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {faction.alignment
+                    ? <span style={{ fontSize:11, color:ALIGNMENT_COLORS[faction.alignment]||"#e8d5b7", background:"#13101f", border:`1px solid ${ALIGNMENT_COLORS[faction.alignment]||"#3a3a3a"}`, borderRadius:8, padding:"2px 8px" }}>{faction.alignment}</span>
+                    : <span style={{ fontSize:11, color:"#3a2a5a", border:"1px dashed #3a2a5a", borderRadius:8, padding:"2px 8px" }}>Set alignment…</span>}
+                </div>
+            }
+            {editingField==="status"
+              ? <select value={fieldVal} autoFocus onChange={e=>commit("status",e.target.value)} onBlur={()=>setEditingField(null)} onKeyDown={e=>{ if(e.key==="Escape") setEditingField(null); }} style={{...selStyle,fontSize:12,padding:"3px 8px"}}>
+                  <option value="">— None —</option>
+                  {FACTION_STATUSES.map(s=><option key={s}>{s}</option>)}
+                </select>
+              : <div onClick={()=>startEdit("status",faction.status||"")} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {faction.status
+                    ? <span style={{ fontSize:11, color:"#e8d5b7", background:"#13101f", border:`1px solid ${FACTION_STATUS_COLORS[faction.status]||"#3a3a3a"}`, borderRadius:8, padding:"2px 8px" }}>{faction.status}</span>
+                    : <span style={{ fontSize:11, color:"#3a2a5a", border:"1px dashed #3a2a5a", borderRadius:8, padding:"2px 8px" }}>Set status…</span>}
+                </div>
+            }
+          </div>
+          {/* Location — searchbox linked to locations list */}
+          {(() => {
+            const locObj = (locations||[]).find(l => l.id === faction.locationId);
+            const locName = locObj ? (locObj.region ? `${locObj.name} (${locObj.region})` : locObj.name) : null;
+            return editingField==="locationId"
+              ? <div style={{ position:"relative" }}>
+                  <input autoFocus value={fieldVal}
+                    onChange={e=>setFieldVal(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==="Escape") setEditingField(null); }}
+                    onBlur={e=>{ if(!e.currentTarget.parentElement?.contains(e.relatedTarget)) setEditingField(null); }}
+                    placeholder="Search location…"
+                    style={{...ghostInput, fontSize:13, width:200}}/>
+                  <div style={{ position:"absolute", top:"100%", left:0, zIndex:30, background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, minWidth:220, maxHeight:180, overflowY:"auto", marginTop:4, boxShadow:"0 4px 16px #00000066" }}>
+                    <div onMouseDown={()=>{ onSave({...faction, locationId:""}); setEditingField(null); }}
+                      style={{ padding:"6px 10px", fontSize:12, color:"#5a4a7a", cursor:"pointer", borderBottom:"1px solid #1e1630", fontStyle:"italic" }}
+                      onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      — None —
+                    </div>
+                    {(locations||[]).filter(l=>!fieldVal||l.name.toLowerCase().includes(fieldVal.toLowerCase())).map(l=>(
+                      <div key={l.id} onMouseDown={()=>{ onSave({...faction, locationId:l.id}); setEditingField(null); }}
+                        style={{ padding:"6px 10px", fontSize:12, color:"#e8d5b7", cursor:"pointer", borderBottom:"1px solid #1e1630" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        📍 {l.name}{l.region?` (${l.region})`:""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              : <div onClick={()=>startEdit("locationId", "")} {...fh} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {locName
+                    ? <span style={{ color:"#9a7fa0", fontSize:13 }}>📍 {locName}</span>
+                    : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>📍 Set location…</span>}
+                </div>;
+          })()}
+        </div>
+
+        {/* Right: color swatches + actions */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8, flexShrink:0 }}>
+          {showColors && (
+            <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+              {/* Preset swatches */}
+              {FACTION_COLORS.map(c=>(
+                <div key={c} onClick={()=>{ clearTimeout(colorTimerRef.current); onSave({...faction,color:c}); setColorDraft(null); }}
+                  style={{ width:20, height:20, borderRadius:4, background:c, cursor:"pointer", border:(colorDraft||faction.color)===c?"2px solid #e8d5b7":"2px solid transparent", transition:"border .1s", flexShrink:0 }}/>
+              ))}
+              {/* Auto (reset) */}
+              <div onClick={()=>{ clearTimeout(colorTimerRef.current); onSave({...faction,color:""}); setColorDraft(null); }}
+                style={{ width:20, height:20, borderRadius:4, background:"#1a1228", cursor:"pointer", border:!faction.color&&!colorDraft?"2px solid #7c5cbf":"2px solid #3a2a5a", fontSize:9, color:"#5a4a7a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }} title="Auto">↺</div>
+              {/* Custom color — visible input styled as swatch, debounced save */}
+              <input type="color" value={colorDraft||faction.color||FACTION_COLORS[0]}
+                onChange={e=>{ const v=e.target.value; setColorDraft(v); clearTimeout(colorTimerRef.current); colorTimerRef.current=setTimeout(()=>{ onSave({...faction,color:v}); setColorDraft(null); },600); }}
+                title="Custom color"
+                style={{ width:20, height:20, borderRadius:4, padding:1, border:"2px solid #3a2a5a", background:"transparent", cursor:"pointer", flexShrink:0 }}/>
             </div>
           )}
-          {!isEditing && faction.location && <div style={{ color:"#9a7fa0", fontSize:13 }}>📍 {faction.location}</div>}
-        </div>
-        <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-          {isEditing ? (
-            <>
-              <button onClick={handleSave} disabled={!editForm.name.trim()} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>💾 Save</button>
-              <button onClick={handleCancelEdit} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px" }}>{faction._isNew ? "Discard" : "Cancel"}</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => onSetEditing(true)} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>✏️ Edit</button>
-              {onDelete && <button onClick={() => onDelete(faction.id)} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px", color:"#c06060", borderColor:"#6b1a1a" }}>🗑️ Delete</button>}
-              <button onClick={onClose} style={{ ...btnSecondary, fontSize:18, padding:"2px 10px", lineHeight:1 }}>×</button>
-            </>
-          )}
+          <div style={{ display:"flex", gap:6 }}>
+            <button onClick={()=>setShowColors(v=>!v)} style={{...btnSecondary, fontSize:14, padding:"4px 10px", lineHeight:1, background: showColors?"#2a1f3d":"transparent" }} title="Change color">🎨</button>
+            {onDelete && (confirmDelete
+              ? <>
+                  <span style={{ fontSize:12, color:"#c8b89a", alignSelf:"center" }}>Delete?</span>
+                  <button onClick={()=>{ setConfirmDelete(false); onDelete(faction.id); }} style={{...btnSecondary,fontSize:12,padding:"4px 10px",color:"#c06060",borderColor:"#6b1a1a"}}>Yes</button>
+                  <button onClick={()=>setConfirmDelete(false)} style={{...btnSecondary,fontSize:12,padding:"4px 10px"}}>No</button>
+                </>
+              : <button onClick={()=>setConfirmDelete(true)} style={{...btnSecondary,fontSize:12,padding:"4px 10px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️</button>
+            )}
+            <button onClick={onClose} style={{...btnSecondary,fontSize:18,padding:"2px 10px",lineHeight:1}}>×</button>
+          </div>
         </div>
       </div>
+      </div>{/* end sticky */}
 
-      {isEditing ? (
-        <div style={{ padding:"20px 24px" }}>
-          <div style={{ display:"flex", gap:12, marginBottom:14 }}>
-            <div style={{ flex:1 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Location</label>
-              <input value={editForm.location} onChange={e => set("location", e.target.value)} style={inputStyle}/>
-            </div>
-          </div>
-          <div style={{ display:"flex", gap:12, marginBottom:14 }}>
-            <div style={{ flex:1 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Alignment</label>
-              <select value={editForm.alignment} onChange={e => set("alignment", e.target.value)} style={selStyle}>
-                <option value="">— Select —</option>
-                {ALIGNMENTS.map(a => <option key={a}>{a}</option>)}
-              </select>
-            </div>
-            <div style={{ flex:1 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Status</label>
-              <select value={editForm.status || ""} onChange={e => set("status", e.target.value)} style={selStyle}>
-                <option value="">— Select —</option>
-                {FACTION_STATUSES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Faction Color</label>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <div onClick={() => colorRef.current.click()} style={{ width:32, height:32, borderRadius:6, background:editForm.color || "#3a2a5a", border:"2px solid #3a2a5a", cursor:"pointer", flexShrink:0 }}/>
-              <input ref={colorRef} type="color" value={editForm.color || FACTION_COLORS[0]} onChange={e => set("color", e.target.value)} style={{ position:"absolute", opacity:0, pointerEvents:"none", width:0, height:0 }}/>
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                {FACTION_COLORS.map(c => (
-                  <div key={c} onClick={() => set("color", c)} style={{ width:22, height:22, borderRadius:4, background:c, cursor:"pointer", border:editForm.color === c ? "2px solid #e8d5b7" : "2px solid transparent", transition:"border .1s" }}/>
-                ))}
-                <div onClick={() => set("color", "")} style={{ width:22, height:22, borderRadius:4, background:"#1a1228", cursor:"pointer", border:!editForm.color ? "2px solid #7c5cbf" : "2px solid #3a2a5a", fontSize:10, color:"#5a4a7a", display:"flex", alignItems:"center", justifyContent:"center", transition:"border .1s" }} title="Auto (use default)">↺</div>
-              </div>
-            </div>
-          </div>
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Description</label>
-            <textarea value={editForm.description} onChange={e => set("description", e.target.value)} rows={4} style={{ ...inputStyle, resize:"vertical" }}/>
-          </div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button onClick={handleSave} disabled={!editForm.name.trim()} style={{ ...btnPrimary, flex:1 }}>💾 Save Faction</button>
-            <button onClick={handleCancelEdit} style={{ ...btnSecondary, flex:1 }}>{faction._isNew ? "Discard" : "Cancel"}</button>
-          </div>
-        </div>
-      ) : (
-        <div>
+      {/* ── Body: Description (left) + Members (right) ── */}
+      <div style={{ display:"flex", alignItems:"flex-start" }}>
+
+        {/* Description tabs */}
+        <div style={{ flex:"1 1 38%", padding:"16px 24px", borderRight:"1px solid #1e1630", minWidth:0 }}>
           {/* Tab bar */}
-          <div style={{ display:"flex", borderBottom:"1px solid #2a1f3d", padding:"0 24px" }}>
-            {[["description","📖 Description"],["members","👥 Members"]].map(([id,label])=>(
-              <button key={id} onClick={()=>setDetailTab(id)}
-                style={{ background:"none", border:"none", borderBottom:`2px solid ${detailTab===id?"#7c5cbf":"transparent"}`, color:detailTab===id?"#c8a96e":"#5a4a7a", cursor:"pointer", fontSize:12, fontWeight:700, letterSpacing:.5, padding:"10px 14px 8px", textTransform:"uppercase", transition:"color .15s" }}>
-                {label}
-              </button>
+          <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:10, flexWrap:"wrap" }}>
+            {allTextTabs.map(t=>(
+              <div key={t.id} style={{ display:"flex", alignItems:"center", gap:1 }}>
+                {confirmDeleteTabId===t.id ? (
+                  <div style={{ display:"flex", alignItems:"center", gap:4, background:"#1a0f0f", border:"1px solid #6b1a1a", borderRadius:6, padding:"3px 8px" }}>
+                    <span style={{ fontSize:11, color:"#c06060" }}>Delete "{t.name}"?</span>
+                    <button onClick={()=>deleteTab(t.id)} style={{ background:"#6b1a1a", border:"none", borderRadius:4, color:"#e8d5b7", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Delete</button>
+                    <button onClick={()=>setConfirmDeleteTabId(null)} style={{ background:"none", border:"1px solid #3a2a5a", borderRadius:4, color:"#9a7fa0", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Cancel</button>
+                  </div>
+                ) : renamingTabId===t.id ? (
+                  <input autoFocus value={renameVal} onChange={e=>setRenameVal(e.target.value)}
+                    onBlur={()=>renameTab(t.id,renameVal)}
+                    onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Escape") renameTab(t.id,renameVal); }}
+                    style={{ width:90, padding:"3px 6px", fontSize:12, background:"#0d0b14", border:"1px solid #7c5cbf", borderRadius:4, color:"#e8d5b7", outline:"none" }}/>
+                ) : (
+                  <>
+                    <button onClick={()=>{ setActiveTextTab(t.id); setEditingField(null); }}
+                      style={{ padding:"3px 10px", borderRadius:6, border:"1px solid", borderColor:activeTextTab===t.id?"#7c5cbf":"#3a2a5a", background:activeTextTab===t.id?"#2a1f3d":"transparent", color:activeTextTab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:11, fontWeight:700 }}>
+                      {t.name}
+                    </button>
+                    {t.id!=="description" && <>
+                      <button onClick={()=>{ setRenamingTabId(t.id); setRenameVal(t.name); }} style={{ padding:"1px 4px", border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }} onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✏️</button>
+                      <button onClick={()=>setConfirmDeleteTabId(t.id)} style={{ padding:"1px 4px", border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }} onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✕</button>
+                    </>}
+                  </>
+                )}
+              </div>
             ))}
+            <button onClick={addTextTab} style={{ padding:"3px 10px", borderRadius:6, border:"1px dashed #3a2a5a", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}>+ Tab</button>
           </div>
-          {detailTab === "description" && (
-            <div style={{ padding:"16px 24px" }}>
-              {faction.description
-                ? <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{faction.description}</div>
-                : <div style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>No description yet. Click Edit to add one.</div>}
-            </div>
-          )}
-          {detailTab === "members" && (
-            <StructureTab faction={faction} allMembers={allMembers} onSave={onSave} onOpenChar={onOpenChar} onSaveChar={onSaveChar}/>
-          )}
+          {/* Content */}
+          {editingField==="__text__"+activeTextTab
+            ? <textarea value={fieldVal} autoFocus
+                ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                onChange={e=>setFieldVal(e.target.value)}
+                onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                onBlur={()=>{ updateTextTab(activeTextTab, fieldVal); setEditingField(null); }}
+                onKeyDown={e=>{ if(e.key==="Escape") { setEditingField(null); setFieldVal(""); } }}
+                style={ghostTextarea}/>
+            : <div onClick={()=>startEdit("__text__"+activeTextTab, activeTabContent)} {...fh} style={{ borderRadius:4, cursor:"text", minHeight:60, padding:"4px 2px" }}>
+                {activeTabContent
+                  ? <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{activeTabContent}</div>
+                  : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add {allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…</span>}
+              </div>
+          }
         </div>
-      )}
+
+        {/* Members / Structure */}
+        <div style={{ flex:"1 1 62%", minWidth:0 }}>
+          <StructureTab faction={faction} allMembers={allMembers} chars={chars} onSave={onSave} onOpenChar={onOpenChar} onSaveChar={onSaveChar}/>
+        </div>
+
+      </div>
     </div>
   );
 }

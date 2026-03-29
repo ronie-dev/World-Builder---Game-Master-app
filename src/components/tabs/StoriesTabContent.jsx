@@ -49,7 +49,6 @@ function StoriesTabContent({
   onOpenChar, onOpenFaction, onOpenLocation, onOpenArtifact, onUpdateArtifacts,
   onAskConfirm, onCloseConfirm,
   onPinHook, pinnedHookIds,
-  isEditing, onSetEditing,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -137,7 +136,6 @@ function StoriesTabContent({
                 storyStatuses={storyStatuses} hookStatuses={hookStatuses}
                 currentTimelineDate={currentTimelineDate}
                 onPinHook={onPinHook} pinnedHookIds={pinnedHookIds}
-                isEditing={isEditing} onSetEditing={onSetEditing}
                 onCancelNew={onCancelNew}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📜</div>

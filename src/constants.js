@@ -56,6 +56,8 @@ export const RARITY_COLORS = { Common:"#9a9a9a", Uncommon:"#4a9a6a", Rare:"#5a8a
 export const defaultArtifact = { id:null, name:"", description:"", lore:"", value:"", rarity:"Common", image:null, holderId:null, storyIds:[] };
 
 export const inputStyle = { width:"100%", background:"#0d0b14", border:"1px solid #3a2a5a", borderRadius:6, padding:"8px 10px", color:"#e8d5b7", fontSize:14, boxSizing:"border-box", outline:"none" };
+export const ghostTextarea = { width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:4, padding:"4px 6px", color:"#b09080", fontSize:14, lineHeight:1.7, boxSizing:"border-box", outline:"none", resize:"none", overflow:"hidden", fontFamily:"inherit" };
+export const ghostInput = { background:"transparent", border:"1px solid #3a2a5a", borderRadius:4, padding:"2px 6px", color:"#9a7fa0", fontSize:13, outline:"none", fontFamily:"inherit" };
 export const selStyle = { ...inputStyle };
 export const btnPrimary = { background:"linear-gradient(135deg,#5a3da0,#7c5cbf)", color:"#e8d5b7", border:"none", borderRadius:6, padding:"8px 18px", cursor:"pointer", fontWeight:700, fontSize:13 };
 export const btnSecondary = { background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 14px", cursor:"pointer", fontSize:13 };

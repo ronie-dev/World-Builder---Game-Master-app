@@ -1,20 +1,21 @@
 import { useState, useEffect, memo } from "react";
 import ImageUploadZone from "./ImageUploadZone.jsx";
-import { inputStyle, selStyle, btnPrimary, btnSecondary, CHAR_STATUSES, CHAR_STATUS_COLORS, STATUS_COLORS, RELATIONSHIP_COLORS, RARITY_COLORS } from "../constants.js";
+import { inputStyle, ghostTextarea, ghostInput, selStyle, btnPrimary, btnSecondary, CHAR_STATUSES, CHAR_STATUS_COLORS, STATUS_COLORS, RELATIONSHIP_COLORS, RARITY_COLORS } from "../constants.js";
 import { getRaceLabel, getFactionColor, uid, formatEventDate, sortEventsDesc } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
-import Badge from "./Badge.jsx";
 import LinkBadge from "./LinkBadge.jsx";
 import FilesPanel from "./FilesPanel.jsx";
 import RelationshipLinker from "./RelationshipLinker.jsx";
 import Lightbox from "./Lightbox.jsx";
+import PortraitZone from "./PortraitZone.jsx";
 
 // ── Faction Role Row ───────────────────────────────────────────────────────────
-function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFaction }) {
+function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFaction, onOpenFaction }) {
   const [addingRole, setAddingRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [factionSearch, setFactionSearch] = useState("");
   const [factionOpen, setFactionOpen] = useState(false);
+  const [editing, setEditing] = useState(!entry.factionId);
 
   const faction = allFactions.find(f => f.id === entry.factionId);
   const tiers = faction?.tiers || [];
@@ -37,6 +38,7 @@ function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFact
     if (val === "__new__") { setAddingRole(true); return; }
     const tier = tiers.find(t => t.id === val);
     updateEntries({ tierId: val, role: tier?.name || "" });
+    setEditing(false);
   };
 
   const confirmNewRole = () => {
@@ -47,16 +49,42 @@ function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFact
     updateEntries({ tierId: newTier.id, role: n });
     setNewRoleName("");
     setAddingRole(false);
+    setEditing(false);
   };
 
   const filteredFactions = allFactions.filter(f =>
     !factionSearch || f.name.toLowerCase().includes(factionSearch.toLowerCase())
   );
 
+  // ── Compact pill (faction already chosen, not editing) ──────────────────────
+  if (faction && !editing) {
+    const fcolor = getFactionColor(allFactions, entry.factionId);
+    return (
+      <div style={{ display:"flex", alignItems:"center", gap:8, background:"#0f0c1a", border:"1px solid #2a1f3d", borderRadius:8, padding:"8px 12px", marginBottom:6 }}>
+        <span style={{ color:fcolor||"#7c5cbf", fontSize:16, flexShrink:0 }}>⚑</span>
+        <span
+          onClick={()=>onOpenFaction&&onOpenFaction(faction)}
+          style={{ fontSize:14, color:onOpenFaction?"#c8a96e":"#e8d5b7", flex:1, cursor:onOpenFaction?"pointer":"default", fontWeight:600 }}
+          onMouseEnter={e=>{ if(onOpenFaction) e.currentTarget.style.textDecoration="underline"; }}
+          onMouseLeave={e=>{ e.currentTarget.style.textDecoration="none"; }}>
+          {faction.name}
+        </span>
+        {entry.role
+          ? <span style={{ fontSize:12, color:"#9a7fa0", background:"#1a1228", borderRadius:4, padding:"2px 10px", flexShrink:0 }}>{entry.role}</span>
+          : <span style={{ fontSize:12, color:"#5a4a7a", fontStyle:"italic", flexShrink:0 }}>No role</span>}
+        <button onClick={()=>setEditing(true)} title="Edit"
+          style={{ background:"none", border:"none", color:"#7c5cbf", cursor:"pointer", fontSize:12, padding:"0 4px", opacity:.7, flexShrink:0 }}>✏️</button>
+        <button onClick={()=>setEntries(entries.filter((_,j)=>j!==i))}
+          style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:16, padding:"0 2px", lineHeight:1, flexShrink:0 }}>×</button>
+      </div>
+    );
+  }
+
+  // ── Edit mode: full dropdowns ───────────────────────────────────────────────
   return (
-    <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"flex-start" }}>
+    <div style={{ display:"flex", gap:6, marginBottom:8, alignItems:"flex-start", flexWrap:"wrap" }}>
       {/* Faction searchable dropdown */}
-      <div style={{ flex:1, position:"relative" }}>
+      <div style={{ flex:"1 1 140px", position:"relative", minWidth:120 }}>
         <div onClick={()=>setFactionOpen(o=>!o)}
           style={{ ...selStyle, display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", userSelect:"none" }}>
           <span style={{ color: faction ? "#e8d5b7" : "#5a4a7a" }}>{faction ? faction.name : "— Select Faction —"}</span>
@@ -101,7 +129,7 @@ function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFact
             <button onClick={()=>{ setAddingRole(false); setNewRoleName(""); }} style={{...btnSecondary,fontSize:11,padding:"3px 6px"}}>✕</button>
           </div>
         ) : (
-          <select value={entry.tierId||""} onChange={e=>handleTierChange(e.target.value)} style={{...selStyle,flex:"0 0 160px"}}>
+          <select value={entry.tierId||""} onChange={e=>handleTierChange(e.target.value)} style={{...selStyle,flex:"0 0 140px"}}>
             <option value="">— Select Role —</option>
             {tiers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
             <option value="__new__">➕ New role…</option>
@@ -109,7 +137,10 @@ function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFact
         )
       )}
 
-      <button onClick={()=>setEntries(entries.filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
+      <div style={{ display:"flex", gap:4 }}>
+        {faction && <button onClick={()=>setEditing(false)} style={{...btnSecondary,fontSize:11,padding:"4px 8px"}}>Done</button>}
+        <button onClick={()=>setEntries(entries.filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
+      </div>
     </div>
   );
 }
@@ -229,17 +260,30 @@ function CharTimeline({ evGroupMap, evGroupOrder, evUndated, stories, onOpenStor
   const [collapsed, setCollapsed] = useState({});
   const toggle = key => setCollapsed(c => ({...c, [key]: !c[key]}));
 
-  const renderEntry = ev => {
+  const renderEntry = (ev, isFirst, isLast) => {
     const isLore = ev.storyId === "__lore__";
     const story = isLore ? null : stories.find(s => s.id === ev.storyId);
     return (
-      <div key={ev.id} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"11px 14px", borderBottom:"1px solid #1e1630", background:"#0d0b14" }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          {ev.title && <div style={{ fontSize:14, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", marginBottom:ev.description?4:0 }}>{ev.title}</div>}
-          {ev.description && <div style={{ fontSize:13, color:"#b09080", lineHeight:1.6, whiteSpace:"pre-wrap" }}>{ev.description}</div>}
+      <div key={ev.id} style={{ display:"flex", gap:0, position:"relative" }}>
+        {/* Rail + dot */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:32, flexShrink:0 }}>
+          <div style={{ width:2, flex:1, background: isFirst ? "transparent" : "#2a1f3d" }}/>
+          <div style={{ width:10, height:10, borderRadius:"50%", background:"#3a2a5a", border:"2px solid #5a4a7a", flexShrink:0 }}/>
+          <div style={{ width:2, flex:1, background: isLast ? "transparent" : "#2a1f3d" }}/>
         </div>
-        {isLore && <span style={{ fontSize:11, color:"#c8a96e", background:"#c8a96e18", border:"1px solid #c8a96e44", borderRadius:8, padding:"2px 8px", flexShrink:0 }}>📜 Lore</span>}
-        {story && <LinkBadge label={story.name} color={STATUS_COLORS[story.status]||"#333"} onClick={()=>onOpenStory(story)} onNewTab={()=>onOpenStory(story,null,{newTab:true})}/>}
+        {/* Card */}
+        <div style={{ flex:1, minWidth:0, margin:"6px 0", background:"#0f0c1a", border:"1px solid #1e1630", borderLeft:"3px solid #2a1f3d", borderRadius:8, padding:"10px 12px" }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:8 }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              {ev.title && <div style={{ fontSize:14, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", marginBottom:ev.description?5:0 }}>{ev.title}</div>}
+              {ev.description && <div style={{ fontSize:13, color:"#9a8070", lineHeight:1.65, whiteSpace:"pre-wrap" }}>{ev.description}</div>}
+            </div>
+            <div style={{ flexShrink:0 }}>
+              {isLore && <span style={{ fontSize:11, color:"#c8a96e", background:"#c8a96e18", border:"1px solid #c8a96e44", borderRadius:8, padding:"2px 8px" }}>📜 Lore</span>}
+              {story && <LinkBadge label={story.name} color={STATUS_COLORS[story.status]||"#333"} onClick={()=>onOpenStory(story)} onNewTab={()=>onOpenStory(story,null,{newTab:true})}/>}
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -248,14 +292,18 @@ function CharTimeline({ evGroupMap, evGroupOrder, evUndated, stories, onOpenStor
     const isOpen = !collapsed[group.key];
     const label = labelOverride || formatEventDate({year:group.year, month:group.month, day:group.day}) || "No date";
     return (
-      <div key={group.key} style={{ marginBottom:10, border:"1px solid #3a2a5a", borderRadius:10, overflow:"hidden" }}>
+      <div key={group.key} style={{ marginBottom:18 }}>
         <div onClick={() => toggle(group.key)}
-          style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"#2a1f3d", cursor:"pointer", userSelect:"none" }}>
-          <span style={{ fontSize:11, color:"#7c5cbf", flexShrink:0 }}>{isOpen ? "▼" : "▶"}</span>
-          <span style={{ fontFamily:"Georgia,serif", fontWeight:700, fontSize:14, color: dimmed?"#6a5a8a":"#c8a96e", flex:1 }}>📅 {label}</span>
+          style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 14px 8px 10px", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, cursor:"pointer", userSelect:"none" }}>
+          <span style={{ fontSize:10, color:"#7c5cbf", flexShrink:0 }}>{isOpen ? "▼" : "▶"}</span>
+          <span style={{ fontFamily:"Georgia,serif", fontWeight:700, fontSize:15, color: dimmed?"#6a5a8a":"#c8a96e", flex:1 }}>📅 {label}</span>
           <span style={{ fontSize:11, color:"#5a4a7a" }}>{group.events.length} event{group.events.length!==1?"s":""}</span>
         </div>
-        {isOpen && <div>{group.events.map(ev => renderEntry(ev))}</div>}
+        {isOpen && (
+          <div style={{ paddingLeft:14 }}>
+            {group.events.map((ev, i) => renderEntry(ev, i===0, i===group.events.length-1))}
+          </div>
+        )}
       </div>
     );
   };
@@ -403,34 +451,85 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
   );
 }
 
-function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, isEditing, onSetEditing }) {
+function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange }) {
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;
   const setSubTab = onSubTabChange ?? setSubTabInternal;
-  const [descExpanded, setDescExpanded] = useState(false);
-  const [editForm, setEditForm] = useState({...char});
   const [lightbox, setLightbox] = useState(null);
   const [activeTextTab, setActiveTextTab] = useState("biography");
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Per-field inline editing
+  const [editingField, setEditingField] = useState(null);
+  const [fieldVal, setFieldVal] = useState("");
+  // Type-change confirmation
+  const [pendingType, setPendingType] = useState(null);
+  // Text-tab management (always visible controls)
   const [renamingTabId, setRenamingTabId] = useState(null);
   const [renameVal, setRenameVal] = useState("");
   const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
+  const [sectionToggles, setSectionToggles] = useState({});
 
-  useEffect(() => { setEditForm({...char}); setDescExpanded(false); setActiveTextTab("biography"); }, [char?.id]); // eslint-disable-line
+  useEffect(() => {
+    setEditingField(null);
+    setFieldVal("");
+    setPendingType(null);
+    setActiveTextTab("biography");
+    setDescExpanded(false);
+    setConfirmDelete(false);
+    setSectionToggles({});
+  }, [char?.id]); // eslint-disable-line
 
   if (!char) return null;
 
-  const set = (k, v) => setEditForm(f => ({...f, [k]:v}));
-  const handleSave = () => { const {_isNew, ...clean} = editForm; onUpdateChar({...char, ...clean}); onSetEditing(false); };
-  const handleCancelEdit = () => { if (char._isNew) { onCancelNew?.(char.id); return; } onSetEditing(false); setEditForm({...char}); };
+  // Commit a single field and exit edit mode
+  const commit = (field, val) => { onUpdateChar({...char, [field]: val}); setEditingField(null); };
+  // Start editing a field (stores current value locally)
+  const startEdit = (field, val) => { setEditingField(field); setFieldVal(val ?? ""); setDescExpanded(false); };
+  const cancelEdit = () => setEditingField(null);
 
-  const linkedStories = stories.filter(s=>(s.characterIds||[]).includes(char.id));
-  const linkedFactions = factions.filter(f=>(char.factions||[]).some(e=>e.factionId===f.id));
-  const relationships = char.relationships||[];
+  const handleClose = () => {
+    if (char._isNew && !char.name?.trim()) { onCancelNew?.(char.id); return; }
+    onClose();
+  };
+
+  // Section collapse helpers — empty sections start collapsed, user can toggle
+  const isSectionOpen = k => {
+    if (k in sectionToggles) return sectionToggles[k];
+    if (k === "secret") return !!char.secret;
+    if (k === "factions") return (char.factions||[]).filter(e=>e.factionId).length > 0;
+    if (k === "appearsIn") return linkedStories.length > 0;
+    if (k === "relationships") return (char.relationships||[]).filter(r=>r.charId).length > 0;
+    if (k === "links") return (char.links||[]).length > 0;
+    return true;
+  };
+  const toggleSection = k => setSectionToggles(t => ({...t, [k]: !isSectionOpen(k)}));
+
+  // Keyboard nav — Escape closes/cancels; handled globally so it works even when focus is outside inputs
+  useEffect(() => {
+    const handler = e => {
+      if (e.key !== "Escape") return;
+      if (editingField !== null) { setEditingField(null); return; }
+      if (pendingType !== null) { setPendingType(null); return; }
+      if (confirmDelete) { setConfirmDelete(false); return; }
+      if (char?._isNew && !char.name?.trim()) { onCancelNew?.(char.id); return; }
+      onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [editingField, pendingType, confirmDelete]); // eslint-disable-line
+
+  // Derived values from char (always from saved prop, not a draft)
+  const linkedStories = stories.filter(s => (s.characterIds||[]).includes(char.id));
+  const relationships = char.relationships || [];
   const raceLabel = getRaceLabel(races, char.raceId, char.subraceId);
-  const raceIcon = (races||[]).find(r=>r.id===char.raceId)?.icon||null;
-  const locationObj = (char.type==="main"||char.type==="side") ? (locations||[]).find(l=>l.id===char.locationId) : null;
+  const raceIcon = (races||[]).find(r => r.id===char.raceId)?.icon || null;
+  const locationObj = (char.type==="main"||char.type==="side") ? (locations||[]).find(l => l.id===char.locationId) : null;
   const locationName = locationObj ? (locationObj.region ? `${locationObj.name} (${locationObj.region})` : locationObj.name) : null;
-  const isPlayer = char.type==="player";
+  const isPlayer = char.type === "player";
+  const statusColor = (charStatuses||[]).find(s => s.name===char.status)?.color || CHAR_STATUS_COLORS[char.status] || "#4a4a6a";
+  const selectedRace = races.find(r => r.id===char.raceId);
+  const subraces = selectedRace?.subraces || [];
 
   const charEvents = [];
   stories.forEach(s => { (s.events||[]).forEach(ev => { if((ev.characterIds||[]).includes(char.id)) charEvents.push({...ev, storyId:s.id, storyName:s.name, storyStatus:s.status}); }); });
@@ -442,363 +541,488 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
     const hasDate = ev.year || ev.month || ev.day;
     if (!hasDate) { evUndated.push(ev); return; }
     const key = `${ev.year||""}|${ev.month||""}|${ev.day||""}`;
-    if (!evGroupMap[key]) {
-      evGroupMap[key] = { key, year:ev.year||"", month:ev.month||"", day:ev.day||"", events:[] };
-      evGroupOrder.push(key);
-    }
+    if (!evGroupMap[key]) { evGroupMap[key] = { key, year:ev.year||"", month:ev.month||"", day:ev.day||"", events:[] }; evGroupOrder.push(key); }
     evGroupMap[key].events.push(ev);
   });
 
-  const selectedRace = races.find(r=>r.id===editForm.raceId);
-  const subraces = selectedRace?.subraces||[];
+  // Subtle hover affordance for clickable fields
+  const fh = { onMouseEnter: e=>e.currentTarget.style.background="#ffffff09", onMouseLeave: e=>e.currentTarget.style.background="transparent" };
+  const LABEL = { fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:6 };
+
+  // Bio/custom tab helpers
+  const allTextTabs = [{id:"biography", name:isPlayer?"Biography":"Description", content:char.description||""}, ...(char.textTabs||[])];
+  const activeTabContent = allTextTabs.find(t=>t.id===activeTextTab)?.content || "";
+  const PREVIEW = 500;
+  const needsFold = activeTabContent.length > PREVIEW;
+  const visibleText = needsFold && !descExpanded ? activeTabContent.slice(0,PREVIEW).trimEnd()+"…" : activeTabContent;
+
+  const updateTextTab = (tabId, content) => {
+    if (tabId==="biography") onUpdateChar({...char, description:content});
+    else onUpdateChar({...char, textTabs:(char.textTabs||[]).map(t=>t.id===tabId?{...t,content}:t)});
+  };
+  const updateFactions = v => onUpdateChar({...char, factions:v});
+  const updateRelationships = v => onUpdateChar({...char, relationships:v});
+  const updateLinks = v => onUpdateChar({...char, links:v});
+  const addTextTab = () => { const id=uid(); onUpdateChar({...char, textTabs:[...(char.textTabs||[]),{id,name:"New Tab",content:""}]}); setActiveTextTab(id); setRenamingTabId(id); setRenameVal("New Tab"); };
+  const renameTab = (tabId, name) => { onUpdateChar({...char, textTabs:(char.textTabs||[]).map(t=>t.id===tabId?{...t,name:name.trim()||t.name}:t)}); setRenamingTabId(null); };
+  const deleteTab = tabId => { if(activeTextTab===tabId) setActiveTextTab("biography"); onUpdateChar({...char, textTabs:(char.textTabs||[]).filter(t=>t.id!==tabId)}); setConfirmDeleteTabId(null); };
 
   return (
-    <div style={{ background:"#13101f", border:"1px solid #7c5cbf", borderRadius:12, marginBottom:20, overflow:"hidden", boxShadow:"0 4px 32px #7c5cbf22", animation:"slideDown .18s ease" }}>
-      <div style={{ background:`linear-gradient(90deg,#2a1f3daa,#13101f)`, padding:"18px 24px", display:"flex", alignItems:"center", gap:20, borderBottom:"1px solid #2a1f3d" }}>
-        {isEditing ? (
-          <div style={{ display:"flex", alignItems:"center", gap:16, flex:1 }}>
-            <div onClick={()=>{}} style={{ flexShrink:0 }}>
-              <Avatar src={editForm.image} name={editForm.name} size={72}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <input value={editForm.name} onChange={e=>set("name",e.target.value)} style={{...inputStyle, fontSize:18, fontFamily:"Georgia,serif", fontWeight:700, marginBottom:8}} placeholder="Name..."/>
-              <ImageUploadZone value={editForm.image} onChange={src=>set("image",src)} size="full"/>
-            </div>
+    <div style={{ background:"#13101f", border:"1px solid #7c5cbf", borderRadius:12, marginBottom:20, overflow:"visible", boxShadow:"0 4px 32px #7c5cbf22", animation:"slideDown .18s ease" }}>
+      <Lightbox src={lightbox} onClose={()=>setLightbox(null)}/>
+
+      {/* ── Sticky header + sub-tabs wrapper ── */}
+      <div style={{ position:"sticky", top:0, zIndex:10, borderRadius:"12px 12px 0 0", overflow:"hidden" }}>
+
+      {/* ── Header ── */}
+      <div style={{ background:`linear-gradient(90deg,#2a1f3d,#13101f)`, padding:"18px 24px", display:"flex", alignItems:"center", gap:20, borderBottom:"1px solid #2a1f3d" }}>
+
+        {/* Portrait */}
+        <PortraitZone value={char.image} onChange={src=>onUpdateChar({...char,image:src})} size={80}/>
+
+        {/* Name + meta — all badges are clickable to edit */}
+        <div style={{ flex:1 }}>
+
+          {/* Name */}
+          {editingField==="name"
+            ? <input value={fieldVal} autoFocus
+                onChange={e=>setFieldVal(e.target.value)}
+                onBlur={()=>commit("name",fieldVal)}
+                onKeyDown={e=>{ if(e.key==="Enter") commit("name",fieldVal); if(e.key==="Escape") cancelEdit(); if(e.key==="Tab"){ e.preventDefault(); commit("name",fieldVal); if(!isPlayer) startEdit("shortDescription",char.shortDescription||""); } }}
+                style={{...inputStyle, fontSize:20, fontFamily:"Georgia,serif", fontWeight:700, marginBottom:6, display:"block", width:"100%", boxSizing:"border-box"}}/>
+            : <div onClick={()=>startEdit("name", char.name||"")} {...fh} style={{ borderRadius:4, cursor:"text", display:"inline-block", marginBottom:6 }}>
+                <span style={{ fontSize:22, fontFamily:"Georgia,serif", color:"#e8d5b7", fontWeight:700 }}>
+                  {char.name || <span style={{ color:"#3a2a5a", fontStyle:"italic" }}>Unnamed Character</span>}
+                </span>
+              </div>
+          }
+
+          {/* Type + Race + Location/Class row */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+
+            {/* TYPE — click to open select; selecting a different type triggers confirm */}
+            {pendingType
+              ? <div style={{ display:"flex", alignItems:"center", gap:6, background:"#1a1228", border:"1px solid #7c5cbf55", borderRadius:6, padding:"4px 10px" }}>
+                  <span style={{ fontSize:12, color:"#c8b89a" }}>Change to {pendingType==="player"?"Player":pendingType==="main"?"Main":"Side"}?</span>
+                  <button onClick={()=>{ onUpdateChar({...char,type:pendingType}); setPendingType(null); }}
+                    style={{ background:"#7c5cbf", color:"#fff", border:"none", borderRadius:4, cursor:"pointer", fontSize:11, padding:"2px 10px", fontWeight:700 }}>Yes</button>
+                  <button onClick={()=>setPendingType(null)}
+                    style={{ background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:4, cursor:"pointer", fontSize:11, padding:"2px 8px" }}>No</button>
+                </div>
+              : editingField==="type"
+                ? <select value={char.type} autoFocus
+                    onChange={e=>{ const t=e.target.value; setEditingField(null); if(t!==char.type) setPendingType(t); }}
+                    onBlur={()=>setEditingField(null)}
+                    style={{...selStyle, fontSize:12, padding:"3px 8px"}}>
+                    <option value="player">🎲 Player</option>
+                    <option value="main">⭐ Main</option>
+                    <option value="side">👤 Side</option>
+                  </select>
+                : <div onClick={()=>startEdit("type",char.type)} {...fh} style={{ borderRadius:4, cursor:"pointer" }}>
+                    <span style={{ fontSize:12, color:"#7c5cbf", background:"#7c5cbf22", borderRadius:4, padding:"3px 10px" }}>
+                      {isPlayer?"🎲 Player":char.type==="main"?"⭐ Main":"👤 Side"} ▾
+                    </span>
+                  </div>
+            }
+
+            {/* RACE */}
+            {editingField==="raceId"
+              ? <select value={fieldVal} autoFocus
+                  onChange={e=>{ onUpdateChar({...char,raceId:e.target.value,subraceId:""}); setEditingField(null); }}
+                  onBlur={()=>setEditingField(null)}
+                  style={{...selStyle, fontSize:12, padding:"3px 8px"}}>
+                  <option value="">— None —</option>
+                  {races.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              : <div onClick={()=>startEdit("raceId",char.raceId||"")} {...fh} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {raceLabel
+                    ? <span style={{ color:"#9a7fa0", fontSize:13, display:"flex", alignItems:"center", gap:4 }}>{raceIcon?<img src={raceIcon} alt="" style={{ width:14,height:14,objectFit:"cover",borderRadius:2 }}/>:"🧬"} {raceLabel}</span>
+                    : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>🧬 Set race…</span>}
+                </div>
+            }
+
+            {/* SUBRACE — only shown when race has subraces */}
+            {subraces.length>0 && (editingField==="subraceId"
+              ? <select value={fieldVal} autoFocus
+                  onChange={e=>{ onUpdateChar({...char,subraceId:e.target.value}); setEditingField(null); }}
+                  onBlur={()=>setEditingField(null)}
+                  style={{...selStyle, fontSize:12, padding:"3px 8px"}}>
+                  <option value="">— None —</option>
+                  {subraces.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              : <div onClick={()=>startEdit("subraceId",char.subraceId||"")} {...fh} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {(() => { const sub=subraces.find(s=>s.id===char.subraceId); return <span style={{ color:"#9a7fa0", fontSize:13 }}>· {sub?sub.name:<span style={{ color:"#3a2a5a", fontStyle:"italic" }}>subrace</span>}</span>; })()}
+                </div>
+            )}
+
+            {/* LOCATION (main+side) */}
+            {!isPlayer && (editingField==="locationId"
+              ? <div style={{ position:"relative" }}>
+                  <input autoFocus value={fieldVal}
+                    onChange={e=>setFieldVal(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==="Escape") setEditingField(null); }}
+                    onBlur={e=>{ if(!e.currentTarget.parentElement?.contains(e.relatedTarget)) setEditingField(null); }}
+                    placeholder="Search location…"
+                    style={{...ghostInput, fontSize:12, width:160}}/>
+                  <div style={{ position:"absolute", top:"100%", left:0, zIndex:30, background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, minWidth:200, maxHeight:180, overflowY:"auto", marginTop:4, boxShadow:"0 4px 16px #00000066" }}>
+                    <div onMouseDown={()=>{ onUpdateChar({...char,locationId:""}); setEditingField(null); }}
+                      style={{ padding:"6px 10px", fontSize:12, color:"#5a4a7a", cursor:"pointer", borderBottom:"1px solid #1e1630", fontStyle:"italic" }}
+                      onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      — None —
+                    </div>
+                    {(locations||[]).filter(l=>!fieldVal||l.name.toLowerCase().includes(fieldVal.toLowerCase())).map(l=>(
+                      <div key={l.id} onMouseDown={()=>{ onUpdateChar({...char,locationId:l.id}); setEditingField(null); }}
+                        style={{ padding:"6px 10px", fontSize:12, color:"#e8d5b7", cursor:"pointer", borderBottom:"1px solid #1e1630" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        📍 {l.name}{l.region?` (${l.region})`:""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              : <div onClick={()=>startEdit("locationId", locationName||"")} {...fh} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {locationName
+                    ? <span style={{ color:"#9a7fa0", fontSize:13 }}>📍 {locationName}</span>
+                    : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>📍 Set location…</span>}
+                </div>
+            )}
+
+            {/* ORIGIN (player) */}
+            {isPlayer && (editingField==="origin"
+              ? <div style={{ position:"relative" }}>
+                  <input autoFocus value={fieldVal}
+                    onChange={e=>setFieldVal(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==="Enter") commit("origin",fieldVal); if(e.key==="Escape") cancelEdit(); }}
+                    onBlur={e=>{ if(!e.currentTarget.parentElement?.contains(e.relatedTarget)) commit("origin",fieldVal); }}
+                    placeholder="Search or type origin…"
+                    style={{...ghostInput, width:180}}/>
+                  {(locations||[]).filter(l=>!fieldVal||l.name.toLowerCase().includes(fieldVal.toLowerCase())).length > 0 && (
+                    <div style={{ position:"absolute", top:"100%", left:0, zIndex:30, background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, minWidth:200, maxHeight:180, overflowY:"auto", marginTop:4, boxShadow:"0 4px 16px #00000066" }}>
+                      <div onMouseDown={()=>commit("origin","")}
+                        style={{ padding:"6px 10px", fontSize:12, color:"#5a4a7a", cursor:"pointer", borderBottom:"1px solid #1e1630", fontStyle:"italic" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        — None —
+                      </div>
+                      {(locations||[]).filter(l=>!fieldVal||l.name.toLowerCase().includes(fieldVal.toLowerCase())).map(l=>(
+                        <div key={l.id} onMouseDown={()=>commit("origin", l.name+(l.region?` (${l.region})`:""))}
+                          style={{ padding:"6px 10px", fontSize:12, color:"#e8d5b7", cursor:"pointer", borderBottom:"1px solid #1e1630" }}
+                          onMouseEnter={e=>e.currentTarget.style.background="#1e1630"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          📍 {l.name}{l.region?` (${l.region})`:""}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              : <div onClick={()=>startEdit("origin",char.origin||"")} {...fh} style={{ borderRadius:4, cursor:"text" }}>
+                  {char.origin
+                    ? <span style={{ color:"#9a7fa0", fontSize:13 }}>📍 {char.origin}</span>
+                    : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>📍 Origin…</span>}
+                </div>
+            )}
+
+            {/* CLASS + LEVEL (player) */}
+            {isPlayer && <>
+              {editingField==="class"
+                ? <input value={fieldVal} autoFocus
+                    onChange={e=>setFieldVal(e.target.value)}
+                    onBlur={()=>commit("class",fieldVal)}
+                    onKeyDown={e=>{ if(e.key==="Enter") commit("class",fieldVal); if(e.key==="Escape") cancelEdit(); }}
+                    placeholder="Class…" style={{...ghostInput, width:110}}/>
+                : <div onClick={()=>startEdit("class",char.class||"")} {...fh} style={{ borderRadius:4, cursor:"text" }}>
+                    {char.class
+                      ? <span style={{ color:"#9a7fa0", fontSize:13 }}>⚔️ {char.class}</span>
+                      : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>⚔️ Class…</span>}
+                  </div>
+              }
+              {editingField==="level"
+                ? <input value={fieldVal} autoFocus
+                    onChange={e=>setFieldVal(e.target.value)}
+                    onBlur={()=>commit("level",fieldVal)}
+                    onKeyDown={e=>{ if(e.key==="Enter") commit("level",fieldVal); if(e.key==="Escape") cancelEdit(); }}
+                    placeholder="Lvl" style={{...ghostInput, color:"#c8a96e", width:60}}/>
+                : <div onClick={()=>startEdit("level",char.level||"")} {...fh} style={{ borderRadius:4, cursor:"text" }}>
+                    {char.level
+                      ? <span style={{ color:"#c8a96e", fontSize:13, fontWeight:700 }}>Lvl {char.level}</span>
+                      : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>Lvl…</span>}
+                  </div>
+              }
+            </>}
+
           </div>
-        ) : (
-          <>
-            <div onClick={char.image ? () => setLightbox(char.image) : undefined} style={{ cursor: char.image ? "zoom-in" : "default", flexShrink:0 }}>
-              <Avatar src={char.image} name={char.name} size={80}/>
+
+          {/* SHORT DESCRIPTION (main+side) */}
+          {(char.type==="main"||char.type==="side") && (
+            <div style={{ marginTop:6 }}>
+              {editingField==="shortDescription"
+                ? <input value={fieldVal} autoFocus
+                    onChange={e=>setFieldVal(e.target.value)}
+                    onBlur={()=>commit("shortDescription",fieldVal)}
+                    onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Tab") { e.preventDefault(); commit("shortDescription",fieldVal); } if(e.key==="Escape") cancelEdit(); }}
+                    placeholder="Short description…" style={{...ghostInput, fontSize:13, color:"#8a7090", width:"100%", boxSizing:"border-box"}}/>
+                : <div onClick={()=>startEdit("shortDescription",char.shortDescription||"")} {...fh} style={{ borderRadius:4, cursor:"text" }}>
+                    {char.shortDescription
+                      ? <span style={{ color:"#8a7090", fontSize:13, fontStyle:"italic" }}>{char.shortDescription}</span>
+                      : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>Add a short description…</span>}
+                  </div>
+              }
             </div>
-            <div style={{ flex:1 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                <span style={{ fontSize:22, fontFamily:"Georgia,serif", color:"#e8d5b7", fontWeight:700 }}>{char.name}</span>
-                <span style={{ fontSize:12, color:"#7c5cbf", background:"#7c5cbf22", borderRadius:4, padding:"2px 8px" }}>{isPlayer?"🎲 Player":char.type==="main"?"⭐ Main":"👤 Side"}</span>
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:4, flexWrap:"wrap" }}>
-                {raceLabel&&<div style={{ color:"#9a7fa0", fontSize:13, display:"flex", alignItems:"center", gap:4 }}>{raceIcon ? <img src={raceIcon} alt="" style={{ width:14, height:14, objectFit:"cover", borderRadius:2 }}/> : "🧬"} {raceLabel}</div>}
-                {locationName&&<div style={{ color:"#9a7fa0", fontSize:13 }}>📍 {locationName}</div>}
-                {isPlayer&&char.class&&<div style={{ color:"#9a7fa0", fontSize:13 }}>⚔️ {char.class}</div>}
-                {isPlayer&&char.level&&<div style={{ color:"#c8a96e", fontSize:13, fontWeight:700 }}>Lvl {char.level}</div>}
-              </div>
-              {char.shortDescription&&<div style={{ color:"#8a7090", fontSize:13, marginTop:5, fontStyle:"italic" }}>{char.shortDescription}</div>}
-            </div>
-          </>
-        )}
-        <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-          {isEditing ? (
-            <>
-              <button onClick={handleSave} disabled={!editForm.name.trim()} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>💾 Save</button>
-              <button onClick={handleCancelEdit} style={{...btnSecondary,fontSize:12,padding:"6px 14px"}}>{char._isNew ? "Discard" : "Cancel"}</button>
-            </>
-          ) : (
-            <>
-              <button onClick={()=>onSetEditing(true)} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>✏️ Edit</button>
-              {onDelete&&<button onClick={()=>onDelete(char.id)} style={{...btnSecondary,fontSize:12,padding:"6px 14px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️ Delete</button>}
-            </>
           )}
-          <button onClick={onClose} style={{...btnSecondary,fontSize:18,padding:"2px 10px",lineHeight:1}}>×</button>
+
+        </div>
+
+        {/* Status + Actions — top right */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8, flexShrink:0 }}>
+          {/* Status badge — click to edit */}
+          <div>
+            {editingField==="status"
+              ? <select value={fieldVal} autoFocus
+                  onChange={e=>{ commit("status", e.target.value); }}
+                  onBlur={()=>cancelEdit()}
+                  onKeyDown={e=>{ if(e.key==="Escape") cancelEdit(); }}
+                  style={{...selStyle, fontSize:12, padding:"3px 8px"}}>
+                  <option value="">— None —</option>
+                  {(charStatuses||CHAR_STATUSES).map(s=><option key={s.name||s} value={s.name||s}>{s.name||s}</option>)}
+                </select>
+              : <div onClick={()=>startEdit("status", char.status||"")} {...fh} style={{ borderRadius:4, cursor:"pointer" }}>
+                  {char.status
+                    ? <span style={{ background:statusColor, color:"#e8d5b7", borderRadius:4, padding:"3px 12px", fontSize:12, fontWeight:700, display:"inline-block" }}>{char.status}</span>
+                    : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic", border:"1px dashed #3a2a5a", borderRadius:4, padding:"3px 10px" }}>Set status…</span>}
+                </div>
+            }
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+          {onDelete && (confirmDelete
+            ? <>
+                <span style={{ fontSize:12, color:"#c8b89a", alignSelf:"center" }}>Delete?</span>
+                <button onClick={()=>{ setConfirmDelete(false); onDelete(char.id); }} style={{...btnSecondary,fontSize:12,padding:"6px 12px",color:"#c06060",borderColor:"#6b1a1a"}}>Yes</button>
+                <button onClick={()=>setConfirmDelete(false)} style={{...btnSecondary,fontSize:12,padding:"6px 12px"}}>No</button>
+              </>
+            : <button onClick={()=>setConfirmDelete(true)} style={{...btnSecondary,fontSize:12,padding:"6px 12px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️</button>
+          )}
+          <button onClick={handleClose} style={{...btnSecondary,fontSize:18,padding:"2px 10px",lineHeight:1}}>×</button>
         </div>
       </div>
 
-      {isEditing ? (
-        <div style={{ padding:"20px 24px" }}>
-          {/* Type toggle */}
-          <div style={{ display:"flex", gap:8, marginBottom:18 }}>
-            {["player","main","side"].map(t=>(
-              <button key={t} onClick={()=>set("type",t)} style={{ flex:1, padding:"8px 0", borderRadius:6, border:`1px solid ${editForm.type===t?"#7c5cbf":"#333"}`, background:editForm.type===t?"#7c5cbf33":"transparent", color:editForm.type===t?"#e8d5b7":"#888", cursor:"pointer", fontWeight:700 }}>
-                {t==="player"?"🎲 Player":t==="main"?"⭐ Main":"👤 Side"}
-              </button>
-            ))}
-          </div>
-          {/* Class + Level (player only) */}
-          {editForm.type==="player"&&(
-            <div style={{ display:"flex", gap:12, marginBottom:14 }}>
-              <div style={{ flex:1 }}>
-                <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Class</label>
-                <input value={editForm.class||""} onChange={e=>set("class",e.target.value)} placeholder="e.g. Ranger…" style={inputStyle}/>
-              </div>
-              <div style={{ flex:"0 0 100px" }}>
-                <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Level</label>
-                <input value={editForm.level||""} onChange={e=>set("level",e.target.value)} placeholder="e.g. 5" style={inputStyle}/>
-              </div>
-            </div>
-          )}
-          {/* Short Description (main + side) */}
-          {(editForm.type==="main"||editForm.type==="side")&&(
-            <div style={{ marginBottom:14 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Short Description</label>
-              <input value={editForm.shortDescription||""} onChange={e=>set("shortDescription",e.target.value)} placeholder="One-line summary visible on the character card…" style={inputStyle}/>
-            </div>
-          )}
-          {/* Race + Subrace */}
-          <div style={{ display:"flex", gap:12, marginBottom:14 }}>
-            <div style={{ flex:1 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Race</label>
-              <select value={editForm.raceId} onChange={e=>{ set("raceId",e.target.value); set("subraceId",""); }} style={selStyle}>
-                <option value="">— Select Race —</option>
-                {races.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-            </div>
-            <div style={{ flex:1 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Subrace</label>
-              <select value={editForm.subraceId} onChange={e=>set("subraceId",e.target.value)} style={{...selStyle,opacity:subraces.length===0?0.4:1}} disabled={subraces.length===0}>
-                <option value="">— None —</option>
-                {subraces.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          </div>
-          {/* Origin (player) / Location (main+side) */}
-          {editForm.type==="player"&&(
-            <div style={{ marginBottom:14 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Origin</label>
-              <input value={editForm.origin||""} onChange={e=>set("origin",e.target.value)} style={inputStyle}/>
-            </div>
-          )}
-          {(editForm.type==="main"||editForm.type==="side")&&(
-            <div style={{ marginBottom:14 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Location</label>
-              <select value={editForm.locationId||""} onChange={e=>set("locationId",e.target.value)} style={selStyle}>
-                <option value="">— None —</option>
-                {(locations||[]).map(l=><option key={l.id} value={l.id}>{l.name}{l.region?` (${l.region})`:""}</option>)}
-              </select>
-            </div>
-          )}
-          {/* Status */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Status</label>
-            <select value={editForm.status||""} onChange={e=>set("status",e.target.value)} style={selStyle}>
-              <option value="">— Select —</option>
-              {(charStatuses||CHAR_STATUSES).map(s=><option key={s.name||s} value={s.name||s}>{s.name||s}</option>)}
-            </select>
-          </div>
-          {/* Factions with roles */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:8, letterSpacing:1, textTransform:"uppercase" }}>Factions</label>
-            {(editForm.factions||[]).map((entry,i)=>(
-              <FactionRoleRow key={entry.id} entry={entry} i={i}
-                allFactions={factions}
-                entries={editForm.factions||[]}
-                setEntries={v=>set("factions",v)}
-                onSaveFaction={onSaveFaction}/>
-            ))}
-            <button onClick={()=>set("factions",[...(editForm.factions||[]),{id:uid(),factionId:"",tierId:"",role:""}])} style={{...btnSecondary,fontSize:12,padding:"5px 14px"}}>+ Add Faction</button>
-          </div>
+      </div>{/* ── end header ── */}
+
+      {/* ── Sub-tabs ── */}
+      <div style={{ display:"flex", borderBottom:"1px solid #2a1f3d", background:"#0f0c1a" }}>
+        {[["details","📋 Details",0],["items","🎒 Items",(char.items||[]).length],["timeline","⏳ Timeline",charEvents.length],["hooks","🔮 Hooks",(char.hooks||[]).length],["files","📁 Files",(char.files||[]).length]].map(([key,label,count])=>(
+          <button key={key} onClick={()=>setSubTab(key)}
+            style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab===key?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab===key?700:400, borderBottom:subTab===key?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
+            {label}{count>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{count}</span>}
+          </button>
+        ))}
+      </div>
+
+      </div>{/* ── end sticky wrapper ── */}
+
+      {/* ── Details tab ── */}
+      {subTab==="details" && (
+        <div style={{ display:"flex", flexWrap:"wrap" }}>
+
           {/* Biography / Custom Text Tabs */}
-          <div style={{ marginBottom:14 }}>
+          <div style={{ flex:"1 1 100%", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}>
             {/* Tab bar */}
-            <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:8, flexWrap:"wrap" }}>
-              {/* Biography — permanent */}
-              <button onClick={()=>setActiveTextTab("biography")} style={{ padding:"4px 12px", borderRadius:"6px 6px 0 0", border:"1px solid", borderColor: activeTextTab==="biography"?"#7c5cbf":"#3a2a5a", borderBottom: activeTextTab==="biography"?"1px solid #1a1228":"1px solid #3a2a5a", background: activeTextTab==="biography"?"#2a1f3d":"transparent", color: activeTextTab==="biography"?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:12, fontWeight:700 }}>
-                {editForm.type==="player"?"Biography":"Description"}
-              </button>
-              {/* Custom tabs */}
-              {(editForm.textTabs||[]).map(t => (
-                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:2 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:10, flexWrap:"wrap" }}>
+              {allTextTabs.map(t=>(
+                <div key={t.id} style={{ display:"flex", alignItems:"center", gap:1 }}>
                   {confirmDeleteTabId===t.id ? (
                     <div style={{ display:"flex", alignItems:"center", gap:4, background:"#1a0f0f", border:"1px solid #6b1a1a", borderRadius:6, padding:"3px 8px" }}>
                       <span style={{ fontSize:11, color:"#c06060" }}>Delete "{t.name}"?</span>
-                      <button onClick={()=>{ if(activeTextTab===t.id) setActiveTextTab("biography"); set("textTabs",(editForm.textTabs||[]).filter(x=>x.id!==t.id)); setConfirmDeleteTabId(null); }} style={{ background:"#6b1a1a", border:"none", borderRadius:4, color:"#e8d5b7", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Delete</button>
+                      <button onClick={()=>deleteTab(t.id)} style={{ background:"#6b1a1a", border:"none", borderRadius:4, color:"#e8d5b7", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Delete</button>
                       <button onClick={()=>setConfirmDeleteTabId(null)} style={{ background:"none", border:"1px solid #3a2a5a", borderRadius:4, color:"#9a7fa0", cursor:"pointer", fontSize:11, padding:"2px 8px" }}>Cancel</button>
                     </div>
                   ) : renamingTabId===t.id ? (
                     <input autoFocus value={renameVal} onChange={e=>setRenameVal(e.target.value)}
-                      onBlur={()=>{ set("textTabs",(editForm.textTabs||[]).map(x=>x.id===t.id?{...x,name:renameVal.trim()||x.name}:x)); setRenamingTabId(null); }}
-                      onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Escape"){ set("textTabs",(editForm.textTabs||[]).map(x=>x.id===t.id?{...x,name:renameVal.trim()||x.name}:x)); setRenamingTabId(null); } }}
+                      onBlur={()=>renameTab(t.id,renameVal)}
+                      onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Escape") renameTab(t.id,renameVal); }}
                       style={{ width:90, padding:"3px 6px", fontSize:12, background:"#0d0b14", border:"1px solid #7c5cbf", borderRadius:4, color:"#e8d5b7", outline:"none" }}/>
                   ) : (
-                    <div style={{ display:"flex", alignItems:"center", gap:1 }}>
-                      <button onClick={()=>setActiveTextTab(t.id)}
-                        style={{ padding:"4px 10px", borderRadius:"6px 6px 0 0", border:"1px solid", borderColor: activeTextTab===t.id?"#7c5cbf":"#3a2a5a", borderBottom: activeTextTab===t.id?"1px solid #1a1228":"1px solid #3a2a5a", background: activeTextTab===t.id?"#2a1f3d":"transparent", color: activeTextTab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:12, fontWeight:700 }}>
+                    <>
+                      <button onClick={()=>{ setActiveTextTab(t.id); setEditingField(null); setDescExpanded(false); }}
+                        style={{ padding:"3px 10px", borderRadius:6, border:"1px solid", borderColor:activeTextTab===t.id?"#7c5cbf":"#3a2a5a", background:activeTextTab===t.id?"#2a1f3d":"transparent", color:activeTextTab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:11, fontWeight:700 }}>
                         {t.name}
                       </button>
-                      <button onClick={()=>{ setRenamingTabId(t.id); setRenameVal(t.name); }} title="Rename tab"
-                        style={{ padding:"2px 5px", borderRadius:4, border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}
-                        onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✏️</button>
-                      <button onClick={()=>setConfirmDeleteTabId(t.id)} title="Delete tab"
-                        style={{ padding:"2px 5px", borderRadius:4, border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}
-                        onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✕</button>
-                    </div>
+                      {t.id!=="biography" && <>
+                        <button onClick={()=>{ setRenamingTabId(t.id); setRenameVal(t.name); }} style={{ padding:"1px 4px", border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }} onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✏️</button>
+                        <button onClick={()=>setConfirmDeleteTabId(t.id)} style={{ padding:"1px 4px", border:"none", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }} onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>✕</button>
+                      </>}
+                    </>
                   )}
                 </div>
               ))}
-              <button onClick={()=>{ const id=uid(); set("textTabs",[...(editForm.textTabs||[]),{id,name:"New Tab",content:""}]); setActiveTextTab(id); setRenamingTabId(id); setRenameVal(""); }} style={{ padding:"4px 10px", borderRadius:6, border:"1px dashed #3a2a5a", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:12 }}>+ Tab</button>
+              <button onClick={addTextTab} style={{ padding:"3px 10px", borderRadius:6, border:"1px dashed #3a2a5a", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}>+ Tab</button>
             </div>
-            {/* Content area */}
-            <div style={{ borderTop:"1px solid #3a2a5a", paddingTop:8 }}>
-              {activeTextTab==="biography"
-                ? <textarea value={editForm.description||""} onChange={e=>set("description",e.target.value)} rows={8} style={{...inputStyle,resize:"vertical"}}/>
-                : (() => { const t=(editForm.textTabs||[]).find(x=>x.id===activeTextTab); return t ? <textarea value={t.content||""} onChange={e=>set("textTabs",(editForm.textTabs||[]).map(x=>x.id===activeTextTab?{...x,content:e.target.value}:x))} rows={8} style={{...inputStyle,resize:"vertical"}}/> : null; })()
-              }
-            </div>
-          </div>
-          {/* Secret (main only) */}
-          {editForm.type==="main"&&(
-            <div style={{ marginBottom:14 }}>
-              <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>🔒 Secret</label>
-              <textarea value={editForm.secret||""} onChange={e=>set("secret",e.target.value)} rows={4} placeholder="Hidden notes, secret agenda, true identity…" style={{...inputStyle,resize:"vertical",borderColor:"#4a2a5a"}}/>
-            </div>
-          )}
-          {/* Relationships */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:8, letterSpacing:1, textTransform:"uppercase" }}>Relationships</label>
-            <RelationshipLinker relationships={editForm.relationships||[]} chars={chars.filter(c=>c.id!==editForm.id)} relationshipTypes={relationshipTypes} onChange={v=>set("relationships",v)}/>
-          </div>
-          {/* External Links */}
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:8, letterSpacing:1, textTransform:"uppercase" }}>External Links</label>
-            {(editForm.links||[]).map((lnk,i)=>(
-              <div key={lnk.id} style={{ display:"flex", gap:8, marginBottom:8 }}>
-                <input value={lnk.label} onChange={e=>{ const l=[...(editForm.links||[])]; l[i]={...l[i],label:e.target.value}; set("links",l); }} placeholder="Label (optional)" style={{...inputStyle,flex:"0 0 160px"}}/>
-                <input value={lnk.url} onChange={e=>{ const l=[...(editForm.links||[])]; l[i]={...l[i],url:e.target.value}; set("links",l); }} placeholder="https://..." style={{...inputStyle,flex:1}}/>
-                <button onClick={()=>set("links",(editForm.links||[]).filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
-              </div>
-            ))}
-            <button onClick={()=>set("links",[...(editForm.links||[]),{id:uid(),label:"",url:""}])} style={{...btnSecondary,fontSize:12,padding:"5px 14px"}}>+ Add Link</button>
-          </div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button onClick={handleSave} disabled={!editForm.name.trim()} style={{...btnPrimary,flex:1}}>💾 Save Character</button>
-            <button onClick={handleCancelEdit} style={{...btnSecondary,flex:1}}>Cancel</button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div style={{ display:"flex", borderBottom:"1px solid #2a1f3d", background:"#0f0c1a" }}>
-            <button onClick={()=>setSubTab("details")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="details"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="details"?700:400, borderBottom:subTab==="details"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>📋 Details</button>
-            <button onClick={()=>setSubTab("items")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="items"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="items"?700:400, borderBottom:subTab==="items"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
-              🎒 Items{(char.items||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.items||[]).length}</span>}
-            </button>
-            <button onClick={()=>setSubTab("timeline")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="timeline"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="timeline"?700:400, borderBottom:subTab==="timeline"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
-              ⏳ Timeline{charEvents.length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{charEvents.length}</span>}
-            </button>
-            <button onClick={()=>setSubTab("hooks")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="hooks"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="hooks"?700:400, borderBottom:subTab==="hooks"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
-              🔮 Hooks{(char.hooks||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.hooks||[]).length}</span>}
-            </button>
-            <button onClick={()=>setSubTab("files")} style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab==="files"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab==="files"?700:400, borderBottom:subTab==="files"?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
-              📁 Files{(char.files||[]).length>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{(char.files||[]).length}</span>}
-            </button>
-          </div>
-          {subTab==="details"&&(
-            <div style={{ display:"flex", flexWrap:"wrap" }}>
-              {isPlayer&&char.origin&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>📍 Origin</div><div style={{ color:"#c8b89a", fontSize:14 }}>{char.origin}</div></div>}
-              {char.status&&<div style={{ flex:"1 1 200px", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}><div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:4 }}>💀 Status</div><div style={{ display:"inline-block", background:(charStatuses||[]).find(s=>s.name===char.status)?.color||CHAR_STATUS_COLORS[char.status]||"#4a4a6a", color:"#e8d5b7", borderRadius:4, padding:"2px 10px", fontSize:13, fontWeight:700 }}>{char.status}</div></div>}
-              {(char.description||(char.textTabs||[]).length>0)&&(()=>{
-                const allTextTabs = [{id:"biography",name:isPlayer?"Biography":"Description",content:char.description||""}, ...(char.textTabs||[])];
-                const activeContent = allTextTabs.find(t=>t.id===activeTextTab)?.content || "";
-                const PREVIEW = 500;
-                const needsFold = activeContent.length > PREVIEW;
-                const visible = needsFold && !descExpanded ? activeContent.slice(0, PREVIEW).trimEnd() + "…" : activeContent;
-                return (
-                  <div style={{ flex:"1 1 100%", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}>
-                    {/* Tab bar */}
-                    {allTextTabs.length > 1 && (
-                      <div style={{ display:"flex", gap:4, marginBottom:10, flexWrap:"wrap" }}>
-                        {allTextTabs.map(t => (
-                          <button key={t.id} onClick={()=>{ setActiveTextTab(t.id); setDescExpanded(false); }}
-                            style={{ padding:"3px 10px", borderRadius:6, border:"1px solid", borderColor: activeTextTab===t.id?"#7c5cbf":"#3a2a5a", background: activeTextTab===t.id?"#2a1f3d":"transparent", color: activeTextTab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:11, fontWeight:700 }}>
-                            {t.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>📖 {allTextTabs.find(t=>t.id===activeTextTab)?.name || (isPlayer?"Biography":"Description")}</div>
-                    {activeContent ? <>
-                      <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{visible}</div>
-                      {needsFold&&(
-                        <button onClick={()=>setDescExpanded(v=>!v)}
-                          style={{ marginTop:10, background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 14px", color:"#7c5cbf", cursor:"pointer", fontSize:12, transition:"border-color .15s, color .15s" }}
+            {/* Content — click text to edit, textarea on click */}
+            {editingField==="__text__"+activeTextTab
+              ? <textarea value={fieldVal} autoFocus
+                  ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                  onChange={e=>setFieldVal(e.target.value)}
+                  onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                  onBlur={()=>{ updateTextTab(activeTextTab, fieldVal); setEditingField(null); }}
+                  onKeyDown={e=>{ if(e.key==="Escape") { setEditingField(null); setFieldVal(""); } }}
+                  style={ghostTextarea}/>
+              : <div onClick={()=>startEdit("__text__"+activeTextTab, activeTabContent)} {...fh}
+                  style={{ borderRadius:4, cursor:"text", minHeight:40, padding:"4px 2px" }}>
+                  {activeTabContent
+                    ? <>
+                        <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{visibleText}</div>
+                        {needsFold&&<button onClick={e=>{ e.stopPropagation(); setDescExpanded(v=>!v); }}
+                          style={{ marginTop:8, background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"3px 12px", color:"#7c5cbf", cursor:"pointer", fontSize:12 }}
                           onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
                           onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
-                          {descExpanded ? "▲ Show less" : "▼ Show more"}
-                        </button>
-                      )}
-                    </> : <div style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>No content yet.</div>}
-                  </div>
-                );
-              })()}
-              {char.type==="main"&&char.secret&&<div style={{ flex:"1 1 100%", padding:"14px 24px", borderBottom:"1px solid #1e1630", background:"#0d0a18" }}><div style={{ fontSize:11, color:"#7c3a7a", letterSpacing:1, textTransform:"uppercase", marginBottom:6 }}>🔒 Secret</div><div style={{ color:"#a07898", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{char.secret}</div></div>}
-              <div style={{ flex:"1 1 50%", padding:"14px 24px", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
-                <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>⚑ Factions</div>
-                {linkedFactions.length===0
-                  ? <span style={{ color:"#5a4a7a", fontSize:13 }}>Not in any faction.</span>
-                  : <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
-                      {(char.factions||[]).filter(e=>e.factionId).map(entry=>{
-                        const f = factions.find(x=>x.id===entry.factionId);
-                        if (!f) return null;
+                          {descExpanded?"▲ Show less":"▼ Show more"}
+                        </button>}
+                      </>
+                    : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add {allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…</span>}
+                </div>
+            }
+          </div>
+
+          {/* Secret (main only) */}
+          {char.type==="main" && (
+            <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630", background:"#0d0a18" }}>
+              <div onClick={()=>toggleSection("secret")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+                onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("secret")?"▼":"▶"}</span>
+                <span style={{...LABEL, marginBottom:0, color:"#7c3a7a"}}>🔒 Secret</span>
+                {!char.secret && !isSectionOpen("secret") && <span style={{ fontSize:11, color:"#4a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
+              </div>
+              {isSectionOpen("secret") && (
+                <div style={{ padding:"0 24px 14px" }}>
+                  {editingField==="secret"
+                    ? <textarea value={fieldVal} autoFocus
+                        ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                        onChange={e=>setFieldVal(e.target.value)}
+                        onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                        onBlur={()=>commit("secret",fieldVal)}
+                        onKeyDown={e=>{ if(e.key==="Escape") cancelEdit(); }}
+                        style={{...ghostTextarea,color:"#a07898"}}/>
+                    : <div onClick={()=>startEdit("secret",char.secret||"")} {...fh} style={{ borderRadius:4, cursor:"text", padding:"2px 0" }}>
+                        {char.secret
+                          ? <div style={{ color:"#a07898", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{char.secret}</div>
+                          : <span style={{ color:"#4a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add secret notes…</span>}
+                      </div>
+                  }
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Factions */}
+          <div style={{ flex:"1 1 50%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
+            <div onClick={()=>toggleSection("factions")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("factions")?"▼":"▶"}</span>
+              <span style={{...LABEL, marginBottom:0}}>⚑ Factions</span>
+              {!(char.factions||[]).filter(e=>e.factionId).length && !isSectionOpen("factions") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
+            </div>
+            {isSectionOpen("factions") && (
+              <div style={{ padding:"0 24px 14px" }}>
+                {(char.factions||[]).map((entry,i)=>(
+                  <FactionRoleRow key={entry.id} entry={entry} i={i} allFactions={factions} entries={char.factions||[]} setEntries={updateFactions} onSaveFaction={onSaveFaction} onOpenFaction={onOpenFaction}/>
+                ))}
+                <button onClick={()=>updateFactions([...(char.factions||[]),{id:uid(),factionId:"",tierId:"",role:""}])} style={{...btnSecondary,fontSize:12,padding:"4px 12px"}}>+ Add Faction</button>
+              </div>
+            )}
+          </div>
+
+          {/* Appears In */}
+          <div style={{ flex:"1 1 50%", borderBottom:"1px solid #1e1630" }}>
+            <div onClick={()=>toggleSection("appearsIn")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("appearsIn")?"▼":"▶"}</span>
+              <span style={{...LABEL, marginBottom:0}}>📜 Appears In</span>
+              {linkedStories.length > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({linkedStories.length})</span>}
+              {!linkedStories.length && !isSectionOpen("appearsIn") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
+            </div>
+            {isSectionOpen("appearsIn") && (
+              <div style={{ padding:"0 24px 14px" }}>
+                {linkedStories.length===0
+                  ? <span style={{ color:"#5a4a7a", fontSize:13 }}>Not linked to any stories.</span>
+                  : <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                      {linkedStories.map(s=>{
+                        const groupId = (s.charGroupAssignments||{})[char.id];
+                        const group = groupId && (s.charGroups||[]).find(g=>g.id===groupId);
                         return (
-                          <div key={entry.id} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-                            <LinkBadge label={f.name} color={getFactionColor(factions,f.id)} onClick={()=>onOpenFaction(f)} onNewTab={()=>onOpenFaction(f,{newTab:true})}/>
-                            {entry.role&&<span style={{ fontSize:11, color:"#9a7fa0" }}>{entry.role}</span>}
+                          <div key={s.id} style={{ display:"flex", flexDirection:"column", alignItems:"flex-start", gap:2 }}>
+                            <LinkBadge label={s.name} color={STATUS_COLORS[s.status]||"#333"} onClick={()=>onOpenStory(s)} onNewTab={()=>onOpenStory(s,null,{newTab:true})}/>
+                            {group && <span style={{ fontSize:10, color:"#7c5cbf", paddingLeft:4 }}>↳ {group.name}</span>}
                           </div>
                         );
                       })}
                     </div>}
               </div>
-              <div style={{ flex:"1 1 50%", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}>
-                <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:8 }}>📜 Appears In</div>
-                {linkedStories.length===0
-                  ? <span style={{ color:"#5a4a7a", fontSize:13 }}>Not linked to any stories.</span>
-                  : <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>{linkedStories.map(s=><LinkBadge key={s.id} label={s.name} color={STATUS_COLORS[s.status]||"#333"} onClick={()=>onOpenStory(s)} onNewTab={()=>onOpenStory(s,null,{newTab:true})}/>)}</div>}
+            )}
+          </div>
+
+          {/* Relationships */}
+          <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630" }}>
+            <div onClick={()=>toggleSection("relationships")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("relationships")?"▼":"▶"}</span>
+              <span style={{...LABEL, marginBottom:0}}>🔗 Relationships</span>
+              {relationships.filter(r=>r.charId).length > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({relationships.filter(r=>r.charId).length})</span>}
+              {!relationships.filter(r=>r.charId).length && !isSectionOpen("relationships") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
+            </div>
+            {isSectionOpen("relationships") && (
+              <div style={{ padding:"0 24px 14px" }}>
+                <RelationshipLinker relationships={relationships} chars={chars.filter(c=>c.id!==char.id)} relationshipTypes={relationshipTypes} onChange={updateRelationships} onOpenChar={onOpenChar}/>
               </div>
-              {relationships.filter(r=>r.charId).length>0&&(
-                <div style={{ flex:"1 1 100%", padding:"14px 24px", borderTop:"1px solid #1e1630" }}>
-                  <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:10 }}>🔗 Relationships</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
-                    {relationships.filter(r=>r.charId).map(rel=>{
-                      const c = chars.find(x=>x.id===rel.charId);
-                      if (!c) return null;
-                      const relColor = (relationshipTypes||[]).find(t=>t.name===rel.type)?.color||RELATIONSHIP_COLORS[rel.type]||"#3a4a6a";
-                      return (
-                        <div key={rel.id} onClick={e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);} }} onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenChar(c,{newTab:true});}}} style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1630", border:`1px solid ${relColor}66`, borderRadius:8, padding:"6px 14px 6px 6px", cursor:"pointer", transition:"border-color .15s" }}
-                          onMouseEnter={e=>e.currentTarget.style.borderColor=relColor}
-                          onMouseLeave={e=>e.currentTarget.style.borderColor=`${relColor}66`}>
-                          <Avatar src={c.image} name={c.name} size={34}/>
-                          <div>
-                            <div style={{ fontSize:13, color:"#e8d5b7", fontWeight:600 }}>{c.name} <span style={{ fontSize:10, color:"#7c5cbf", opacity:.8 }}>↗</span></div>
-                            <div style={{ fontSize:11, color:relColor, fontWeight:700 }}>{rel.type}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {(char.links||[]).filter(l=>l.url).length>0&&(
-                <div style={{ flex:"1 1 100%", padding:"14px 24px", borderTop:"1px solid #1e1630" }}>
-                  <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:10 }}>🔗 External Links</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                    {(char.links||[]).filter(l=>l.url).map(lnk=>(
-                      <a key={lnk.id} href={lnk.url} target="_blank" rel="noopener noreferrer"
-                        style={{ display:"inline-flex", alignItems:"center", gap:6, color:"#7c9cbf", fontSize:13, textDecoration:"none", width:"fit-content" }}
-                        onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"}
-                        onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>
-                        <span style={{ fontSize:11 }}>↗</span>
-                        {lnk.label||lnk.url}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
+            )}
+          </div>
+
+          {/* External Links */}
+          <div style={{ flex:"1 1 100%" }}>
+            <div onClick={()=>toggleSection("links")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("links")?"▼":"▶"}</span>
+              <span style={{...LABEL, marginBottom:0}}>🔗 External Links</span>
+              {(char.links||[]).length > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({(char.links||[]).length})</span>}
+              {!(char.links||[]).length && !isSectionOpen("links") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
             </div>
-          )}
-          {subTab==="items"&&<ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}/>}
-          {subTab==="timeline"&&(
-            <div style={{ padding:"20px 24px" }}>
-              {charEvents.length===0 ? (
-                <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a" }}>
-                  <div style={{ fontSize:36, marginBottom:10 }}>⏳</div>
-                  <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>No events linked to this character.</div>
-                </div>
-              ) : (
-                <CharTimeline evGroupMap={evGroupMap} evGroupOrder={evGroupOrder} evUndated={evUndated} stories={stories} onOpenStory={onOpenStory}/>
-              )}
-            </div>
-          )}
-          {subTab==="hooks"&&<CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds}/>}
-          {subTab==="files"&&onUpdateChar&&<FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
-        </>
+            {isSectionOpen("links") && (
+              <div style={{ padding:"0 24px 14px" }}>
+                {(char.links||[]).map((lnk,i)=>(
+                  <div key={lnk.id} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                    {editingField===`link-${lnk.id}`
+                      ? <>
+                          <input value={lnk.label} onChange={e=>{ const l=[...(char.links||[])]; l[i]={...l[i],label:e.target.value}; updateLinks(l); }} placeholder="Label" style={{...inputStyle,flex:"0 0 130px"}}/>
+                          <input autoFocus value={lnk.url} onChange={e=>{ const l=[...(char.links||[])]; l[i]={...l[i],url:e.target.value}; updateLinks(l); }} placeholder="https://..." style={{...inputStyle,flex:1}}
+                            onBlur={()=>setEditingField(null)} onKeyDown={e=>{ if(e.key==="Escape"||e.key==="Enter") setEditingField(null); }}/>
+                        </>
+                      : <>
+                          <a href={lnk.url} target="_blank" rel="noreferrer"
+                            style={{ flex:1, fontSize:13, color:"#c8a96e", textDecoration:"none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                            onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"}
+                            onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>
+                            🔗 {lnk.label||lnk.url||"Untitled link"}
+                          </a>
+                          <button onClick={()=>setEditingField(`link-${lnk.id}`)} style={{...btnSecondary,fontSize:11,padding:"3px 8px",flexShrink:0}}>✏️</button>
+                        </>
+                    }
+                    <button onClick={()=>updateLinks((char.links||[]).filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
+                  </div>
+                ))}
+                <button onClick={()=>{ updateLinks([...(char.links||[]),{id:uid(),label:"",url:""}]); if(!isSectionOpen("links")) setSectionToggles(t=>({...t,links:true})); }} style={{...btnSecondary,fontSize:12,padding:"4px 12px"}}>+ Add Link</button>
+              </div>
+            )}
+          </div>
+
+        </div>
       )}
-      <Lightbox src={lightbox} onClose={()=>setLightbox(null)}/>
+
+      {subTab==="items" && <ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}/>}
+      {subTab==="timeline" && (
+        <div style={{ padding:"20px 24px" }}>
+          {charEvents.length===0
+            ? <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a" }}><div style={{ fontSize:36, marginBottom:10 }}>⏳</div><div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>No events linked to this character.</div></div>
+            : <CharTimeline evGroupMap={evGroupMap} evGroupOrder={evGroupOrder} evUndated={evUndated} stories={stories} onOpenStory={onOpenStory}/>
+          }
+        </div>
+      )}
+      {subTab==="hooks" && <CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds}/>}
+      {subTab==="files" && onUpdateChar && <FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
     </div>
   );
 }

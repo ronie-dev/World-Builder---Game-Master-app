@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.5.0 — Notes Overhaul, Visual Polish & Navigation
+
+### Notes — Unified Pinned Reminders
+- All pinned items (story hooks, character hooks, and manual notes) are now in a **single merged list** — freely interleave hooks and reminders in any order
+- **Drag-and-drop reordering** across all pin types — grab the ⠿ handle to move any item anywhere in the list
+- Removed the old ▲/▼ up/down arrows in favour of drag
+
+### Notes — Hook Navigation
+- Clicking a **pinned story hook** title or story name now navigates directly to that story with the **Hooks tab** pre-selected
+- Clicking a **pinned character hook** title or character name navigates to that character with the **Hooks tab** pre-selected
+
+### Notes — Session Log Improvements
+- Session event cards redesigned: each event is now a **card** with a colored left border (purple when linked to a story, dark when not)
+- Events are spaced with a gap instead of being dense borderless rows
+- The "🔗 Story" link is now a pill badge; "+ Add to Timeline" is a subtle rounded button
+- Session headers have a consistent dark background with date in gold and event count dimmed
+- Event and pin text inputs now use the **ghost input** style — transparent, minimal
+
+### Notes — Add to Timeline Story Picker
+- Story picker modal now shows each story's **status badge** (colored by your status settings) next to the story name
+
+### Notes — Scratch Pad
+- Scratch Pad now **auto-expands** to always show full content — no more scrolling inside the text box
+- Typing is now instant — scratch pad uses local state and only saves to the campaign when you stop editing (same pattern as description fields), eliminating the input lag caused by re-rendering the whole tab on every keystroke
+
+### Timeline — Image Management
+- Timeline event cards with an image now show **Gallery** and **Remove** buttons directly under the image in view mode — no need to open the edit form to swap or clear an image
+
+### Factions — Visual
+- Faction gradient header direction flipped — color bleeds in from the right
+- Faction now supports a **photo/logo** (same PortraitZone as characters and stories)
+- Faction portrait visible in the **faction list cards**
+- Faction portrait supports lightbox zoom
+
+### Factions — Location Search
+- Location field replaced with an **inline search box** linked to the Locations list — type to filter, click to assign
+
+### Factions — Description Tabs
+- Faction description now uses the same **multi-tab editor** as characters — add, rename, and delete custom description tabs
+
+### Factions — Color Picker
+- Color picker is now always accessible via a small color swatch icon
+- Color saves automatically after you stop picking (debounced) — no more Apply button
+
+### Shared — PortraitZone
+- Characters, Stories, and Factions all use a new shared **PortraitZone** component
+- Image stays fully visible — **four corner icon buttons** appear on hover: 🔍 zoom, 📷 upload file, 🖼️ gallery, ✕ remove
+- Drag-and-drop an image file from outside the app directly onto the portrait zone
+
+### Global Timeline
+- Visual redesign matching the Story/Character Timeline style: vertical rail with dots, colored left border per story, image + title row, description below, character chips with avatar and short description
+
+---
+
 ## v0.4.3 — Character Details, Gallery & QoL Improvements
 
 ### Characters — Header Redesign
