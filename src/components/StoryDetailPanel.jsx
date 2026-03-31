@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from "react";
 import ImageUploadZone from "./ImageUploadZone.jsx";
 import PortraitZone from "./PortraitZone.jsx";
-import { inputStyle, ghostTextarea, ghostInput, selStyle, btnPrimary, btnSecondary, STATUS_COLORS, DEFAULT_STORY_STATUSES, DEFAULT_HOOK_STATUSES, RARITY_COLORS } from "../constants.js";
+import { inputStyle, ghostTextarea, ghostInput, selStyle, btnPrimary, btnSecondary, STATUS_COLORS, DEFAULT_STORY_STATUSES, DEFAULT_HOOK_STATUSES, DEFAULT_RARITIES } from "../constants.js";
 import { uid, sortEventsDesc } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
 import Timeline from "./Timeline.jsx";
@@ -142,7 +142,7 @@ function LootTab({ story, onUpdateStory, artifacts, onUpdateArtifacts, chars, on
           <div style={{ fontSize:11, color:"#c8a96e", letterSpacing:1, textTransform:"uppercase", marginBottom:10 }}>✨ Linked Artifacts</div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {linkedArtifacts.map(a => {
-              const rc = RARITY_COLORS[a.rarity] || "#9a9a9a";
+              const rc = rarityColors[a.rarity] || "#9a9a9a";
               const holder = a.holderId ? (chars||[]).find(c => c.id === a.holderId) : null;
               return (
                 <div key={a.id} onClick={() => onOpenArtifact?.(a)} style={{ background:"#0f0c1a", border:`1px solid ${rc}33`, borderLeft:`3px solid ${rc}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center", cursor: onOpenArtifact ? "pointer" : "default", transition:"border-color .15s" }}
@@ -245,8 +245,9 @@ function LootTab({ story, onUpdateStory, artifacts, onUpdateArtifacts, chars, on
   );
 }
 
-function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onCancelNew, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds }) {
+function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onCancelNew, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds, rarities }) {
   const storyStatusList = storyStatuses || DEFAULT_STORY_STATUSES;
+  const rarityColors = Object.fromEntries((rarities || DEFAULT_RARITIES).map(r => [r.name, r.color]));
   const storyColorMap = Object.fromEntries(storyStatusList.map(s => [s.name, s.color]));
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;

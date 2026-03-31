@@ -16,7 +16,7 @@ function CharactersTabContent({
   onNewChar, onDeleteChar, onCancelNew,
   onOpenStory, onOpenFaction, onOpenChar, onOpenArtifact,
   onSaveChar, onSaveFaction, onUpdateArtifacts,
-  onPinCharHook, pinnedCharHookIds,
+  onPinCharHook, pinnedCharHookIds, rarities,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -86,7 +86,7 @@ function CharactersTabContent({
                 onUpdateChar={onSaveChar} onSaveFaction={onSaveFaction} artifacts={artifacts}
                 onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}
                 onPinCharHook={onPinCharHook} pinnedCharHookIds={pinnedCharHookIds}
-                subTab={charSubTab} onSubTabChange={v=>updPg({ charSubTab: v })}/>
+                subTab={charSubTab} onSubTabChange={v=>updPg({ charSubTab: v })} rarities={rarities}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>👤</div>
                 <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a character to view details</div>

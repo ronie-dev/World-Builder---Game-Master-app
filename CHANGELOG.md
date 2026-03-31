@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.5.1 — Era Timeline, Filter Polish & Bug Fixes
+
+### Timeline — Era Separators
+- Era separators now appear in **Lore → Events** tab, not just the Global Timeline
+- Lore Events tab has a **horizontal jump bar** (same as Global Timeline) with clickable year dots and era markers
+- Era separators are placed **after the last event of the era's start year** (bottom of the year group, not the top)
+- Eras whose `startYear` is below all existing events now show as **tail separators** at the bottom of the timeline and right end of the jump bar
+- Era markers in the jump bar are clickable and scroll to the separator
+
+### Characters — Filter Dropdowns
+- Race, Location, Status, and Faction filters are now **searchable comboboxes** — click to open, type to filter, pick an option
+- Active filters highlight in purple
+- Fixed a bug where filter dropdowns had **no effect** (function updater was passed instead of a value)
+
+### Scratch Pad
+- Fixed Scratch Pad not **auto-expanding** on load — textarea now resizes whenever content changes, including after campaign switch or import
+
 ## v0.5.0 — Notes Overhaul, Visual Polish & Navigation
 
 ### Notes — Unified Pinned Reminders

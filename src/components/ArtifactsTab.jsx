@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from "react";
 import { uid } from "../utils.jsx";
-import { RARITIES, RARITY_COLORS, defaultArtifact, inputStyle, selStyle, btnPrimary, btnSecondary, iconBtn } from "../constants.js";
+import { DEFAULT_RARITIES, defaultArtifact, inputStyle, selStyle, btnPrimary, btnSecondary, iconBtn } from "../constants.js";
 import Avatar from "./Avatar.jsx";
 import ImageUploadZone from "./ImageUploadZone.jsx";
 
@@ -46,8 +46,10 @@ function HolderPicker({ chars, holderId, onChange }) {
 }
 
 // ── Artifact Detail Panel ──────────────────────────────────────────────────────
-function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClose, onCancelNew, isEditing, onSetEditing, onOpenChar, onOpenStory }) {
+function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClose, onCancelNew, isEditing, onSetEditing, onOpenChar, onOpenStory, rarities }) {
   const [form, setForm] = useState({ ...defaultArtifact, ...artifact });
+  const rList = rarities || DEFAULT_RARITIES;
+  const rarityColors = Object.fromEntries(rList.map(r => [r.name, r.color]));
   const [imgOpen, setImgOpen] = useState(false);
   const [storySearch, setStorySearch] = useState("");
 
@@ -61,7 +63,7 @@ function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClo
   const handleSave = () => { const { _isNew, ...clean } = form; onSave(clean); onSetEditing(false); };
   const handleCancel = () => { if (artifact._isNew) { onCancelNew?.(); return; } onSetEditing(false); setForm({ ...defaultArtifact, ...artifact }); };
 
-  const rarityColor = RARITY_COLORS[isEditing ? form.rarity : artifact.rarity] || "#9a9a9a";
+  const rarityColor = rarityColors[isEditing ? form.rarity : artifact.rarity] || "#9a9a9a";
   const holder = artifact.holderId ? chars.find(c => c.id === artifact.holderId) : null;
   const linkedStories = (artifact.storyIds || []).map(id => stories.find(s => s.id === id)).filter(Boolean);
 
@@ -124,16 +126,16 @@ function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClo
           <div style={{ marginBottom:14 }}>
             <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:6, letterSpacing:1, textTransform:"uppercase" }}>Rarity</label>
             <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-              {RARITIES.map(r => {
-                const rc = RARITY_COLORS[r];
-                const sel = form.rarity === r;
+              {rList.map(r => {
+                const rc = rarityColors[r.name];
+                const sel = form.rarity === r.name;
                 return (
-                  <div key={r} onClick={() => set("rarity", r)}
+                  <div key={r.name} onClick={() => set("rarity", r.name)}
                     style={{ padding:"4px 12px", borderRadius:14, cursor:"pointer", fontSize:12, transition:"all .12s",
                       border:`1px solid ${sel ? rc : "#3a2a5a"}`,
                       background: sel ? rc + "33" : "transparent",
                       color: sel ? rc : "#7a7a9a" }}>
-                    {r}
+                    {r.name}
                   </div>
                 );
               })}
@@ -259,7 +261,9 @@ function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClo
 }
 
 // ── Main Tab ───────────────────────────────────────────────────────────────────
-function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar, onOpenStory, onAskConfirm, onCloseConfirm, navArtifactId }) {
+function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar, onOpenStory, onAskConfirm, onCloseConfirm, navArtifactId, rarities }) {
+  const rList = rarities || DEFAULT_RARITIES;
+  const rarityColors = Object.fromEntries(rList.map(r => [r.name, r.color]));
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [search, setSearch] = useState("");
@@ -329,13 +333,13 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
                 style={{ padding:"3px 10px", borderRadius:14, cursor:"pointer", fontSize:11, border:`1px solid ${!rarityFilter?"#7c5cbf":"#3a2a5a"}`, background:!rarityFilter?"#7c5cbf33":"transparent", color:!rarityFilter?"#c8b8e8":"#7a7a9a" }}>
                 All
               </div>
-              {RARITIES.map(r => {
-                const color = RARITY_COLORS[r];
-                const sel = rarityFilter === r;
+              {rList.map(r => {
+                const color = rarityColors[r.name];
+                const sel = rarityFilter === r.name;
                 return (
-                  <div key={r} onClick={() => setRarityFilter(sel ? "" : r)}
+                  <div key={r.name} onClick={() => setRarityFilter(sel ? "" : r.name)}
                     style={{ padding:"3px 10px", borderRadius:14, cursor:"pointer", fontSize:11, border:`1px solid ${sel ? color : "#3a2a5a"}`, background:sel ? color+"33" : "transparent", color:sel ? color : "#7a7a9a" }}>
-                    {r}
+                    {r.name}
                   </div>
                 );
               })}
@@ -352,7 +356,7 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {filtered.map(a => {
-                const rarityColor = RARITY_COLORS[a.rarity] || "#9a9a9a";
+                const rarityColor = rarityColors[a.rarity] || "#9a9a9a";
                 const holder = a.holderId ? chars.find(c => c.id === a.holderId) : null;
                 const isSel = selectedId === a.id;
                 return (
@@ -398,6 +402,7 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
               onSetEditing={setIsEditing}
               onOpenChar={onOpenChar}
               onOpenStory={onOpenStory}
+              rarities={rarities}
             />
           ) : (
             <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>

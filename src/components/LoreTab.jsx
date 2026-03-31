@@ -4,6 +4,7 @@ import { uid } from "../utils.jsx";
 import Timeline from "./Timeline.jsx";
 import CharLinker from "./CharLinker.jsx";
 import ImageUploadZone from "./ImageUploadZone.jsx";
+import PantheonTab from "./PantheonTab.jsx";
 
 function EventModal({ event, chars, onClose, onSave }) {
   const [form, setForm] = useState({ ...defaultEvent, ...event });
@@ -45,8 +46,14 @@ function EventModal({ event, chars, onClose, onSave }) {
   );
 }
 
-function LoreTab({ events, chars, onUpdateEvents, onOpenChar, onAskConfirm, onCloseConfirm }) {
+const LORE_TABS = [
+  { id: "events", label: "📜 Events" },
+  { id: "pantheon", label: "⛪ Pantheon" },
+];
+
+function LoreTab({ events, chars, onUpdateEvents, onOpenChar, onAskConfirm, onCloseConfirm, deities, onUpdateDeities, factions, locations, deityAlignments, eras }) {
   const [eventModal, setEventModal] = useState(null);
+  const [subTab, setSubTab] = useState("events");
 
   const saveEvent = form => {
     const updated = form.id ? events.map(e=>e.id===form.id?form:e) : [{...form, id:uid()}, ...events];
@@ -62,33 +69,62 @@ function LoreTab({ events, chars, onUpdateEvents, onOpenChar, onAskConfirm, onCl
     });
   };
 
-  const moveEvent = (id, dir) => {
-    const ev = events.find(e => e.id === id);
-    if (!ev) return;
-    const key = `${ev.year||""}|${ev.month||""}|${ev.day||""}`;
-    const groupIndices = events.map((e,i)=>({e,i})).filter(({e})=>`${e.year||""}|${e.month||""}|${e.day||""}`===key).map(({i})=>i);
-    const pos = groupIndices.findIndex(i => events[i].id === id);
-    const targetPos = dir==="up" ? pos-1 : pos+1;
-    if (targetPos < 0 || targetPos >= groupIndices.length) return;
-    const newEvents = [...events];
-    [newEvents[groupIndices[pos]], newEvents[groupIndices[targetPos]]] = [newEvents[groupIndices[targetPos]], newEvents[groupIndices[pos]]];
-    onUpdateEvents(newEvents);
+  const reorderEvent = (sourceId, targetId) => {
+    const sourceIdx = events.findIndex(e => e.id === sourceId);
+    const targetIdx = events.findIndex(e => e.id === targetId);
+    if (sourceIdx === -1 || targetIdx === -1) return;
+    const next = [...events];
+    const [moved] = next.splice(sourceIdx, 1);
+    next.splice(targetIdx, 0, moved);
+    onUpdateEvents(next);
   };
 
   return (
-    <div>
-      <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 6px", fontSize:26 }}>Lore</h1>
-      <p style={{ color:"#5a4a7a", fontSize:13, margin:"0 0 24px" }}>World events not tied to any story — shown on the Global Timeline.</p>
-      <Timeline
-        events={events}
-        chars={chars}
-        onAdd={prefill => setEventModal({...defaultEvent, ...(prefill||{})})}
-        onEdit={ev => setEventModal({...ev})}
-        onDelete={deleteEvent}
-        onOpenChar={onOpenChar}
-        onMove={moveEvent}
-      />
-      {eventModal && <EventModal event={eventModal} chars={chars} onClose={() => setEventModal(null)} onSave={saveEvent}/>}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header + sub-tab bar */}
+      <div style={{ marginBottom: 20, flexShrink: 0 }}>
+        <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 14px", fontSize:26 }}>Lore</h1>
+        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #2a1f3d", paddingBottom: 0 }}>
+          {LORE_TABS.map(t => (
+            <button key={t.id} onClick={() => setSubTab(t.id)}
+              style={{ background: "none", border: "none", borderBottom: subTab === t.id ? "2px solid #7c5cbf" : "2px solid transparent", color: subTab === t.id ? "#e8d5b7" : "#6a5a8a", cursor: "pointer", fontSize: 13, padding: "6px 14px", marginBottom: -1, fontWeight: subTab === t.id ? 700 : 400, transition: "color .15s" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Events sub-tab */}
+      {subTab === "events" && (
+        <div>
+          <p style={{ color:"#5a4a7a", fontSize:13, margin:"0 0 24px" }}>World events not tied to any story — shown on the Global Timeline.</p>
+          <Timeline
+            events={events}
+            chars={chars}
+            eras={eras || []}
+            onSaveEvent={saveEvent}
+            onDelete={deleteEvent}
+            onOpenChar={onOpenChar}
+            onReorder={reorderEvent}
+          />
+          {eventModal && <EventModal event={eventModal} chars={chars} onClose={() => setEventModal(null)} onSave={saveEvent}/>}
+        </div>
+      )}
+
+      {/* Pantheon sub-tab */}
+      {subTab === "pantheon" && (
+        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+          <PantheonTab
+            deities={deities || []}
+            onUpdateDeities={onUpdateDeities}
+            factions={factions || []}
+            locations={locations || []}
+            deityAlignments={deityAlignments || []}
+            onAskConfirm={onAskConfirm}
+            onCloseConfirm={onCloseConfirm}
+          />
+        </div>
+      )}
     </div>
   );
 }

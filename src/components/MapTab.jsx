@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from "react";
 import { uid } from "../utils.jsx";
-import { btnPrimary, btnSecondary, LOCATION_TYPES, selStyle } from "../constants.js";
+import { btnPrimary, btnSecondary, selStyle } from "../constants.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const zoomBtnStyle = {

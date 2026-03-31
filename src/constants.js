@@ -30,6 +30,7 @@ export const DEFAULT_CHAR_STATUSES = [
 export const CHAR_STATUS_COLORS = { Alive:"#2d6a4f", Dead:"#6b1a1a", Unknown:"#4a4a6a" };
 export const STATUS_COLORS = { Draft:"#4a4a6a", Active:"#2d6a4f", Completed:"#1a3a6b", Abandoned:"#6b1a1a" };
 export const LOCATION_TYPES = ["City","Town","Village","Fortress","Dungeon","Ruins","Forest","Mountain","Cave","Temple","Port","Wasteland","Other"];
+export const DEFAULT_LOCATION_TYPES = ["City","Town","Village","Fortress","Dungeon","Ruins","Forest","Mountain","Cave","Temple","Port","Wasteland","Other"];
 export const ALIGNMENT_COLORS = { Good:"#2d6a4f", Evil:"#6b1a1a", Neutral:"#4a4a6a", Chaotic:"#7a3b00", Lawful:"#1a3a6b", Unknown:"#3a3a3a" };
 export const TONE_COLORS = { Epic:"#5a3da0", Dark:"#3a2a5a", Comedic:"#7a5000", Mystery:"#1a4a4a", Romance:"#6b1a3a", Horror:"#5a1a1a", Political:"#2a4a2a", Adventure:"#3a5a1a" };
 export const FACTION_COLORS = ["#5a3da0","#2d6a4f","#6b1a1a","#7a3b00","#1a3a6b","#1a4a4a","#6b1a3a","#3a5a1a"];
@@ -53,7 +54,20 @@ export const defaultFilters = { raceId:"", locationId:"", status:"", factionId:"
 
 export const RARITIES = ["Common","Uncommon","Rare","Very Rare","Legendary","Artifact"];
 export const RARITY_COLORS = { Common:"#9a9a9a", Uncommon:"#4a9a6a", Rare:"#5a8abf", "Very Rare":"#9a5abf", Legendary:"#c8a96e", Artifact:"#c06060" };
+export const DEFAULT_RARITIES = [
+  {name:"Common", color:"#9a9a9a"}, {name:"Uncommon", color:"#4a9a6a"}, {name:"Rare", color:"#5a8abf"},
+  {name:"Very Rare", color:"#9a5abf"}, {name:"Legendary", color:"#c8a96e"}, {name:"Artifact", color:"#c06060"},
+];
 export const defaultArtifact = { id:null, name:"", description:"", lore:"", value:"", rarity:"Common", image:null, holderId:null, storyIds:[] };
+export const DEITY_ALIGNMENTS = ["Benevolent","Neutral","Malevolent","Unknown"];
+export const DEITY_ALIGNMENT_COLORS = { Benevolent:"#2d6a4f", Neutral:"#7c5cbf", Malevolent:"#8b1a1a", Unknown:"#4a4a6a" };
+export const DEFAULT_DEITY_ALIGNMENTS = [
+  {name:"Benevolent", color:"#2d6a4f"}, {name:"Neutral", color:"#7c5cbf"},
+  {name:"Malevolent", color:"#8b1a1a"}, {name:"Unknown",  color:"#4a4a6a"},
+];
+export const defaultDeity = { id:null, name:"", title:"", domains:[], alignment:"Unknown", symbol:"", description:"", image:null, locationIds:[], factionIds:[] };
+
+export const defaultEra = { id: null, name: "", startYear: "", endYear: "", color: "#7c5cbf" };
 
 export const inputStyle = { width:"100%", background:"#0d0b14", border:"1px solid #3a2a5a", borderRadius:6, padding:"8px 10px", color:"#e8d5b7", fontSize:14, boxSizing:"border-box", outline:"none" };
 export const ghostTextarea = { width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:4, padding:"4px 6px", color:"#b09080", fontSize:14, lineHeight:1.7, boxSizing:"border-box", outline:"none", resize:"none", overflow:"hidden", fontFamily:"inherit" };

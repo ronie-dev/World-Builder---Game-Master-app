@@ -1,11 +1,11 @@
 import { useState, useEffect, memo } from "react";
-import { inputStyle, selStyle, btnPrimary, btnSecondary, STATUS_COLORS, LOCATION_TYPES, defaultLocation } from "../constants.js";
+import { inputStyle, selStyle, btnPrimary, btnSecondary, STATUS_COLORS, defaultLocation } from "../constants.js";
 import { getFactionColor } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
 import Badge from "./Badge.jsx";
 import LinkBadge from "./LinkBadge.jsx";
 
-function LocationDetailPanel({ location, chars, factions, stories, onClose, onSave, onDelete, onOpenChar, onOpenStory, onOpenFaction, onShowOnMap, isEditing, onSetEditing }) {
+function LocationDetailPanel({ location, chars, factions, stories, onClose, onSave, onDelete, onOpenChar, onOpenStory, onOpenFaction, onShowOnMap, isEditing, onSetEditing, locationTypes }) {
   const [editForm, setEditForm] = useState({ ...defaultLocation, ...location });
   const [sideOpen, setSideOpen] = useState(false);
 
@@ -81,7 +81,7 @@ function LocationDetailPanel({ location, chars, factions, stories, onClose, onSa
               <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Type</label>
               <select value={editForm.type} onChange={e => set("type", e.target.value)} style={selStyle}>
                 <option value="">— Select —</option>
-                {LOCATION_TYPES.map(t => <option key={t}>{t}</option>)}
+                {(locationTypes||[]).map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
           </div>

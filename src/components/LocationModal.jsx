@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { inputStyle, selStyle, btnPrimary, btnSecondary, LOCATION_TYPES, defaultLocation } from "../constants.js";
+import { inputStyle, selStyle, btnPrimary, btnSecondary, defaultLocation } from "../constants.js";
 
-export default function LocationModal({ location, onClose, onSave }) {
+export default function LocationModal({ location, onClose, onSave, locationTypes }) {
   const [form, setForm] = useState({ ...defaultLocation, ...location });
   const set = (k, v) => setForm(f => ({...f, [k]:v}));
   return (
@@ -18,7 +18,7 @@ export default function LocationModal({ location, onClose, onSave }) {
           <label style={{ display:"block", fontSize:12, color:"#b09060", marginBottom:4, letterSpacing:1, textTransform:"uppercase" }}>Type</label>
           <select value={form.type} onChange={e=>set("type",e.target.value)} style={selStyle}>
             <option value="">— Select —</option>
-            {LOCATION_TYPES.map(t=><option key={t}>{t}</option>)}
+            {(locationTypes||[]).map(t=><option key={t}>{t}</option>)}
           </select>
         </div>
         <div style={{ marginBottom:14 }}>

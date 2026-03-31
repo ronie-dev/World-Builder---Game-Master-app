@@ -109,7 +109,20 @@ function EventForm({ draft, setDraft, chars, currentTimelineDate, onSave, onCanc
   );
 }
 
-export default function Timeline({ events, chars, onSaveEvent, onDelete, onOpenChar, onReorder, currentTimelineDate, highlightEventId, onHighlightClear }) {
+function EraSeparator({ era }) {
+  const ac = era.color || "#7c5cbf";
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:10, margin:"10px 0 6px", padding:"9px 16px",
+      background:`${ac}18`, border:`1px solid ${ac}44`, borderLeft:`4px solid ${ac}`, borderRadius:8 }}>
+      <span style={{ fontFamily:"Georgia,serif", fontWeight:700, fontSize:14, color:ac }}>{era.name}</span>
+      {(era.startYear || era.endYear) && (
+        <span style={{ fontSize:11, color:"#9a8ab0" }}>{era.startYear}{era.endYear ? ` — ${era.endYear}` : ""}</span>
+      )}
+    </div>
+  );
+}
+
+export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, onOpenChar, onReorder, currentTimelineDate, highlightEventId, onHighlightClear }) {
   const { openGallery } = useGallery();
   const [collapsed, setCollapsed] = useState({});
   const [lightbox, setLightbox] = useState(null);
@@ -120,7 +133,20 @@ export default function Timeline({ events, chars, onSaveEvent, onDelete, onOpenC
   const [addingGroupKey, setAddingGroupKey] = useState(null); // "__top__" or a date group key
   const [addDraft, setAddDraft] = useState({});
   const entryRefs = useRef({});
+  const groupRefs = useRef({});
+  const eraRefs = useRef({});
+  const [activeKey, setActiveKey] = useState(null);
   const toggle = key => setCollapsed(c => ({...c, [key]: !c[key]}));
+
+  const jumpTo = key => {
+    setActiveKey(key);
+    const el = groupRefs.current[key];
+    if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+  };
+  const jumpToEra = eraId => {
+    const el = eraRefs.current[eraId];
+    if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+  };
 
   const groupMap = {};
   const groupOrder = [];
@@ -136,6 +162,14 @@ export default function Timeline({ events, chars, onSaveEvent, onDelete, onOpenC
     }
     groupMap[key].events.push(ev);
   });
+
+  const minEventYear = groupOrder.length > 0 ? parseInt(groupMap[groupOrder[groupOrder.length - 1]].year) : null;
+  const tailEras = (eras || [])
+    .filter(era => {
+      const sy = parseInt(era.startYear);
+      return !isNaN(sy) && era.startYear && minEventYear !== null && sy <= minEventYear;
+    })
+    .sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear));
 
   useEffect(() => {
     if (!highlightEventId) return;
@@ -287,14 +321,81 @@ export default function Timeline({ events, chars, onSaveEvent, onDelete, onOpenC
     );
   };
 
+  const JumpBar = () => {
+    if (groupOrder.length === 0) return null;
+    const items = [];
+    groupOrder.forEach((key, i) => {
+      const group = groupMap[key];
+      const prevKey = groupOrder[i - 1];
+      const prevYear = prevKey ? parseInt(groupMap[prevKey].year) : null;
+      const currYear = parseInt(group.year);
+      // Era markers (approach 1: startYear between groups)
+      if (group.year) {
+        (eras || [])
+          .filter(era => {
+            const sy = parseInt(era.startYear);
+            return !isNaN(sy) && era.startYear && sy > currYear && prevYear !== null && prevYear >= sy;
+          })
+          .sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear))
+          .forEach(era => {
+            const ac = era.color || "#7c5cbf";
+            items.push(
+              <div key={`era-jump-${era.id}`} onClick={() => jumpToEra(era.id)}
+                style={{ position:"relative", zIndex:2, display:"flex", flexDirection:"column", alignItems:"center", padding:"0 10px", flexShrink:0, cursor:"pointer" }}
+                onMouseEnter={e => e.currentTarget.style.opacity="0.75"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+                <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:ac, marginBottom:4, whiteSpace:"nowrap", letterSpacing:.5 }}>✦ {era.name}</div>
+                <div style={{ width:3, height:14, background:ac, borderRadius:2, flexShrink:0 }}/>
+                <div style={{ fontSize:9, color:ac+"99", marginTop:3, whiteSpace:"nowrap" }}>{era.startYear}</div>
+              </div>
+            );
+          });
+      }
+      // Group dot
+      const isActive = activeKey === key;
+      const showLabel = i === 0 || groupMap[groupOrder[i-1]]?.year !== group.year;
+      items.push(
+        <div key={key} onClick={() => jumpTo(key)}
+          style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", alignItems:"center", cursor:"pointer", padding:"0 6px", flexShrink:0 }}>
+          <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:isActive?"#c8a96e":"#7c5cbf", marginBottom:4, letterSpacing:.5, opacity:showLabel?1:0, pointerEvents:"none", whiteSpace:"nowrap" }}>{group.year || "?"}</div>
+          <div style={{ width:isActive?14:9, height:isActive?14:9, borderRadius:"50%", background:isActive?"#c8a96e":"#7c5cbf", border:`2px solid ${isActive?"#c8a96e":"#5a3da0"}`, boxShadow:isActive?"0 0 10px #c8a96e88":"none", transition:"all .15s", flexShrink:0 }}/>
+          <div style={{ fontSize:9, color:isActive?"#c8a96e99":"#4a3a6a", marginTop:3, whiteSpace:"nowrap" }}>{group.events.length}</div>
+        </div>
+      );
+    });
+    // Tail era markers
+    tailEras.forEach(era => {
+      const ac = era.color || "#7c5cbf";
+      items.push(
+        <div key={`era-jump-tail-${era.id}`} onClick={() => jumpToEra(era.id)}
+          style={{ position:"relative", zIndex:2, display:"flex", flexDirection:"column", alignItems:"center", padding:"0 10px", flexShrink:0, cursor:"pointer" }}
+          onMouseEnter={e => e.currentTarget.style.opacity="0.75"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+          <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:ac, marginBottom:4, whiteSpace:"nowrap", letterSpacing:.5 }}>✦ {era.name}</div>
+          <div style={{ width:3, height:14, background:ac, borderRadius:2, flexShrink:0 }}/>
+          <div style={{ fontSize:9, color:ac+"99", marginTop:3, whiteSpace:"nowrap" }}>{era.startYear}</div>
+        </div>
+      );
+    });
+    return (
+      <div style={{ borderBottom:"1px solid #2a1f3d", paddingBottom:10, marginBottom:16 }}>
+        <div style={{ overflowX:"auto", display:"flex", alignItems:"center", paddingBottom:4, scrollbarWidth:"thin", scrollbarColor:"#3a2a5a transparent" }}>
+          <div style={{ position:"relative", display:"flex", alignItems:"center", gap:0, minWidth:"max-content" }}>
+            <div style={{ position:"absolute", top:"50%", left:0, right:0, height:2, background:"linear-gradient(90deg,transparent,#3a2a5a 5%,#3a2a5a 95%,transparent)", transform:"translateY(-50%)", zIndex:0 }}/>
+            {items}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderGroup = (group, labelOverride, dimmed) => {
     const isOpen = !collapsed[group.key];
     const label = labelOverride || formatEventDate({year:group.year, month:group.month, day:group.day}) || "No date";
     const groupAddKey = `${group.year||""}|${group.month||""}|${group.day||""}`;
+    const isActive = activeKey === group.key;
     return (
-      <div key={group.key} style={{ marginBottom:18 }}>
+      <div key={group.key} ref={el => { groupRefs.current[group.key] = el; }} style={{ marginBottom:18, scrollMargin:"40%" }}>
         <div onClick={() => toggle(group.key)}
-          style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 14px 8px 10px", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:8, cursor:"pointer", userSelect:"none" }}>
+          style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 14px 8px 10px", background:"#1a1228", border:`1px solid ${isActive?"#c8a96e44":"#3a2a5a"}`, borderRadius:8, cursor:"pointer", userSelect:"none", transition:"border-color .15s" }}>
           <span style={{ fontSize:10, color:"#7c5cbf", flexShrink:0 }}>{isOpen ? "▼" : "▶"}</span>
           <span style={{ fontFamily:"Georgia,serif", fontWeight:700, fontSize:15, color: dimmed?"#6a5a8a":"#c8a96e", flex:1 }}>📅 {label}</span>
           <span style={{ fontSize:11, color:"#5a4a7a", marginRight:6 }}>{group.events.length} event{group.events.length!==1?"s":""}</span>
@@ -313,6 +414,7 @@ export default function Timeline({ events, chars, onSaveEvent, onDelete, onOpenC
 
   return (
     <div>
+      <JumpBar/>
       {/* Top new event */}
       <div style={{ display:"flex", justifyContent:"flex-end", marginBottom: addingGroupKey==="__top__" ? 0 : 12 }}>
         {addingGroupKey !== "__top__" && (
@@ -330,7 +432,31 @@ export default function Timeline({ events, chars, onSaveEvent, onDelete, onOpenC
         ? <div style={{ textAlign:"center", padding:"24px 0", color:"#5a4a7a", border:"1px dashed #2a1f3d", borderRadius:8, fontSize:13 }}>No events yet.</div>
         : (
           <div>
-            {groupOrder.map(key => renderGroup(groupMap[key]))}
+            {groupOrder.map((key, idx) => {
+              const group = groupMap[key];
+              const prevKey = groupOrder[idx - 1];
+              const prevYear = prevKey ? parseInt(groupMap[prevKey].year) : null;
+              const currYear = parseInt(group.year);
+              const separators = (eras || [])
+                .filter(era => {
+                  const sy = parseInt(era.startYear);
+                  return !isNaN(sy) && era.startYear && sy > currYear && prevYear !== null && prevYear >= sy;
+                })
+                .sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear));
+              return [
+                ...separators.map(era => (
+                  <div key={`sep-${era.id}-${key}`} ref={el => { if (el) eraRefs.current[era.id] = el; }}>
+                    <EraSeparator era={era}/>
+                  </div>
+                )),
+                renderGroup(group),
+              ];
+            })}
+            {tailEras.map(era => (
+              <div key={`tail-sep-${era.id}`} ref={el => { if (el) eraRefs.current[era.id] = el; }}>
+                <EraSeparator era={era}/>
+              </div>
+            ))}
             {undated.length > 0 && renderGroup(
               { key:"__undated__", year:"", month:"", day:"", events: undated },
               "No date set", true

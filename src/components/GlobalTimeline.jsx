@@ -4,11 +4,25 @@ import { formatEventDate, sortEventsDesc } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
 import Lightbox from "./Lightbox.jsx";
 
-export default function GlobalTimeline({ stories, chars, loreEvents, onOpenStory, onOpenChar }) {
+function EraSeparator({ era }) {
+  const ac = era.color || "#7c5cbf";
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:10, margin:"10px 0 6px", padding:"9px 16px",
+      background:`${ac}18`, border:`1px solid ${ac}44`, borderLeft:`4px solid ${ac}`, borderRadius:8 }}>
+      <span style={{ fontFamily:"Georgia,serif", fontWeight:700, fontSize:14, color:ac }}>{era.name}</span>
+      {(era.startYear || era.endYear) && (
+        <span style={{ fontSize:11, color:"#9a8ab0" }}>{era.startYear}{era.endYear ? ` — ${era.endYear}` : ""}</span>
+      )}
+    </div>
+  );
+}
+
+export default function GlobalTimeline({ stories, chars, loreEvents, eras, onOpenStory, onOpenChar }) {
   const [collapsed, setCollapsed] = useState({});
   const [lightbox, setLightbox] = useState(null);
   const [activeKey, setActiveKey] = useState(null);
   const groupRefs = useRef({});
+  const eraRefs = useRef({});
   const toggle = key => setCollapsed(c => ({...c, [key]: !c[key]}));
 
   const allEvents = [];
@@ -37,6 +51,20 @@ export default function GlobalTimeline({ stories, chars, loreEvents, onOpenStory
     ...(undated.length > 0 ? [{ group: { key:"__undated__", year:"", month:"", day:"", events: undated }, labelOverride:"No date set", dimmed: true }] : [])
   ];
 
+  const datedGroups = allGroups.filter(g => !g.labelOverride && g.group.year);
+  const minEventYear = datedGroups.length > 0 ? parseInt(datedGroups[datedGroups.length - 1].group.year) : null;
+  const tailEras = (eras || [])
+    .filter(era => {
+      const sy = parseInt(era.startYear);
+      return !isNaN(sy) && era.startYear && minEventYear !== null && sy <= minEventYear;
+    })
+    .sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear));
+
+  const jumpToEra = eraId => {
+    const el = eraRefs.current[eraId];
+    if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+  };
+
   const jumpTo = key => {
     setActiveKey(key);
     const el = groupRefs.current[key];
@@ -52,30 +80,72 @@ export default function GlobalTimeline({ stories, chars, loreEvents, onOpenStory
   );
 
   // ── Quick-jump bar ───────────────────────────────────────────────────────────
-  const JumpBar = () => (
-    <div style={{ position:"sticky", top:0, zIndex:20, background:"#0d0b14", borderBottom:"1px solid #2a1f3d", paddingBottom:10, marginBottom:16, boxShadow:"0 4px 20px #0d0b14" }}>
-      <div style={{ overflowX:"auto", display:"flex", alignItems:"center", paddingBottom:4, scrollbarWidth:"thin", scrollbarColor:"#3a2a5a transparent" }}>
-        <div style={{ position:"relative", display:"flex", alignItems:"center", gap:0, minWidth:"max-content" }}>
-          <div style={{ position:"absolute", top:"50%", left:0, right:0, height:2, background:"linear-gradient(90deg,transparent,#3a2a5a 5%,#3a2a5a 95%,transparent)", transform:"translateY(-50%)", zIndex:0 }}/>
-          {allGroups.map(({ group, labelOverride, dimmed }, i) => {
-            const label = labelOverride || (group.year ? group.year : formatEventDate({year:group.year,month:group.month,day:group.day}) || "?");
-            const isActive = activeKey === group.key;
-            const showLabel = !labelOverride && group.year
-              ? (i === 0 || allGroups[i-1]?.group?.year !== group.year || allGroups[i-1]?.labelOverride)
-              : true;
-            return (
-              <div key={group.key} onClick={() => jumpTo(group.key)}
-                style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", alignItems:"center", cursor:"pointer", padding:"0 6px", flexShrink:0 }}>
-                <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:isActive?"#c8a96e":dimmed?"#4a3a6a":"#7c5cbf", marginBottom:4, letterSpacing:.5, opacity:showLabel?1:0, pointerEvents:"none", whiteSpace:"nowrap" }}>{label}</div>
-                <div style={{ width:isActive?14:9, height:isActive?14:9, borderRadius:"50%", background:isActive?"#c8a96e":dimmed?"#2a1f3d":"#7c5cbf", border:`2px solid ${isActive?"#c8a96e":dimmed?"#3a2a5a":"#5a3da0"}`, boxShadow:isActive?"0 0 10px #c8a96e88":"none", transition:"all .15s", flexShrink:0 }}/>
-                <div style={{ fontSize:9, color:isActive?"#c8a96e99":"#4a3a6a", marginTop:3, whiteSpace:"nowrap" }}>{group.events.length}</div>
+  const JumpBar = () => {
+    const items = [];
+    allGroups.forEach(({ group, labelOverride, dimmed }, i) => {
+      // Insert era markers before this group if era boundary falls here
+      if (!labelOverride && group.year) {
+        const prevGroup = i > 0 ? allGroups[i - 1] : null;
+        const prevYear = (prevGroup && !prevGroup.labelOverride && prevGroup.group.year) ? parseInt(prevGroup.group.year) : null;
+        const currYear = parseInt(group.year);
+        (eras || [])
+          .filter(era => {
+            const sy = parseInt(era.startYear);
+            return !isNaN(sy) && era.startYear && sy > currYear && prevYear !== null && prevYear >= sy;
+          })
+          .sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear))
+          .forEach(era => {
+            const ac = era.color || "#7c5cbf";
+            items.push(
+              <div key={`era-jump-${era.id}`} onClick={() => jumpToEra(era.id)}
+                style={{ position:"relative", zIndex:2, display:"flex", flexDirection:"column", alignItems:"center", padding:"0 10px", flexShrink:0, cursor:"pointer" }}
+                onMouseEnter={e => e.currentTarget.style.opacity="0.75"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+                <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:ac, marginBottom:4, whiteSpace:"nowrap", letterSpacing:.5 }}>✦ {era.name}</div>
+                <div style={{ width:3, height:14, background:ac, borderRadius:2, flexShrink:0 }}/>
+                <div style={{ fontSize:9, color:ac+"99", marginTop:3, whiteSpace:"nowrap" }}>{era.startYear}</div>
               </div>
             );
-          })}
+          });
+      }
+      // Normal group dot
+      const label = labelOverride || (group.year ? group.year : formatEventDate({year:group.year,month:group.month,day:group.day}) || "?");
+      const isActive = activeKey === group.key;
+      const showLabel = !labelOverride && group.year
+        ? (i === 0 || allGroups[i-1]?.group?.year !== group.year || allGroups[i-1]?.labelOverride)
+        : true;
+      items.push(
+        <div key={group.key} onClick={() => jumpTo(group.key)}
+          style={{ position:"relative", zIndex:1, display:"flex", flexDirection:"column", alignItems:"center", cursor:"pointer", padding:"0 6px", flexShrink:0 }}>
+          <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:isActive?"#c8a96e":dimmed?"#4a3a6a":"#7c5cbf", marginBottom:4, letterSpacing:.5, opacity:showLabel?1:0, pointerEvents:"none", whiteSpace:"nowrap" }}>{label}</div>
+          <div style={{ width:isActive?14:9, height:isActive?14:9, borderRadius:"50%", background:isActive?"#c8a96e":dimmed?"#2a1f3d":"#7c5cbf", border:`2px solid ${isActive?"#c8a96e":dimmed?"#3a2a5a":"#5a3da0"}`, boxShadow:isActive?"0 0 10px #c8a96e88":"none", transition:"all .15s", flexShrink:0 }}/>
+          <div style={{ fontSize:9, color:isActive?"#c8a96e99":"#4a3a6a", marginTop:3, whiteSpace:"nowrap" }}>{group.events.length}</div>
+        </div>
+      );
+    });
+    // Tail eras: startYear below all event years — appear at the right end of the bar
+    tailEras.forEach(era => {
+      const ac = era.color || "#7c5cbf";
+      items.push(
+        <div key={`era-jump-tail-${era.id}`} onClick={() => jumpToEra(era.id)}
+          style={{ position:"relative", zIndex:2, display:"flex", flexDirection:"column", alignItems:"center", padding:"0 10px", flexShrink:0, cursor:"pointer" }}
+          onMouseEnter={e => e.currentTarget.style.opacity="0.75"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+          <div style={{ fontSize:10, fontFamily:"Georgia,serif", fontWeight:700, color:ac, marginBottom:4, whiteSpace:"nowrap", letterSpacing:.5 }}>✦ {era.name}</div>
+          <div style={{ width:3, height:14, background:ac, borderRadius:2, flexShrink:0 }}/>
+          <div style={{ fontSize:9, color:ac+"99", marginTop:3, whiteSpace:"nowrap" }}>{era.startYear}</div>
+        </div>
+      );
+    });
+    return (
+      <div style={{ position:"sticky", top:0, zIndex:20, background:"#0d0b14", borderBottom:"1px solid #2a1f3d", paddingBottom:10, marginBottom:16, boxShadow:"0 4px 20px #0d0b14" }}>
+        <div style={{ overflowX:"auto", display:"flex", alignItems:"center", paddingBottom:4, scrollbarWidth:"thin", scrollbarColor:"#3a2a5a transparent" }}>
+          <div style={{ position:"relative", display:"flex", alignItems:"center", gap:0, minWidth:"max-content" }}>
+            <div style={{ position:"absolute", top:"50%", left:0, right:0, height:2, background:"linear-gradient(90deg,transparent,#3a2a5a 5%,#3a2a5a 95%,transparent)", transform:"translateY(-50%)", zIndex:0 }}/>
+            {items}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── Single event card ────────────────────────────────────────────────────────
   const renderEvent = (ev, isFirst, isLast) => {
@@ -190,7 +260,33 @@ export default function GlobalTimeline({ stories, chars, loreEvents, onOpenStory
   return (
     <div style={{ paddingLeft:4 }}>
       <JumpBar/>
-      {allGroups.map((g, i) => renderGroup(g, i))}
+      {allGroups.map(({ group, labelOverride, dimmed }, idx) => {
+        const items = [];
+        if (!labelOverride && group.year) {
+          const prevGroup = allGroups[idx - 1];
+          const prevYear = (prevGroup && !prevGroup.labelOverride && prevGroup.group.year)
+            ? parseInt(prevGroup.group.year) : null;
+          const currYear = parseInt(group.year);
+          (eras || [])
+            .filter(era => {
+              const sy = parseInt(era.startYear);
+              return !isNaN(sy) && era.startYear && sy > currYear && prevYear !== null && prevYear >= sy;
+            })
+            .sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear))
+            .forEach(era => items.push(
+              <div key={`sep-${era.id}-${group.key}`} ref={el => { if (el) eraRefs.current[era.id] = el; }}>
+                <EraSeparator era={era}/>
+              </div>
+            ));
+        }
+        items.push(renderGroup({ group, labelOverride, dimmed }, idx));
+        return items;
+      })}
+      {tailEras.map(era => (
+        <div key={`tail-sep-${era.id}`} ref={el => { if (el) eraRefs.current[era.id] = el; }}>
+          <EraSeparator era={era}/>
+        </div>
+      ))}
       <Lightbox src={lightbox} onClose={()=>setLightbox(null)}/>
     </div>
   );

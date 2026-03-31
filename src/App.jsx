@@ -3,8 +3,10 @@ import useStateWithRef from "./useStateWithRef.js";
 import {
   DEFAULT_RACES, CHAR_STATUS_COLORS, RELATIONSHIP_COLORS,
   DEFAULT_CHAR_STATUSES, DEFAULT_RELATIONSHIP_TYPES, DEFAULT_STORY_STATUSES, DEFAULT_HOOK_STATUSES,
+  DEFAULT_LOCATION_TYPES, DEFAULT_RARITIES, DEFAULT_DEITY_ALIGNMENTS, defaultDeity,
   btnPrimary, btnSecondary, iconBtn, inputStyle, ghostInput,
   defaultChar, defaultStory, defaultFaction, defaultLocation, defaultFilters,
+  defaultEra,
 } from "./constants.js";
 import { uid, getRaceLabel } from "./utils.jsx";
 
@@ -335,13 +337,13 @@ function NotesTab({ notes, setNotes, chars, stories, setStories, onOpenStory, on
   const [scratchLocal, setScratchLocal] = useState(notes.scratch || "");
   // Sync if notes.scratch changes externally (campaign switch / import)
   useEffect(() => { setScratchLocal(notes.scratch || ""); }, [notes.scratch]);
-  // Size on mount
+  // Resize whenever content changes (mount, campaign switch, import)
   useEffect(() => {
     const el = scratchRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
-  }, []);
+  }, [scratchLocal]);
   // per-session new event input
   const [newEventText, setNewEventText] = useState({});
   // inline event editing: { sessionId, eventId }
@@ -877,54 +879,75 @@ function ColorSwatch({ color, onChange }) {
 }
 
 // ── Simple List Editor ────────────────────────────────────────────────────────
-function SimpleListEditor({ items, onChange, placeholder, onRename }) {
+function SimpleListEditor({ items, onChange, placeholder, onRename, noColor }) {
   const [newItem, setNewItem] = useState("");
   const [newColor, setNewColor] = useState("#7c5cbf");
   const [editingIdx, setEditingIdx] = useState(null);
   const [editVal, setEditVal] = useState("");
   const [editColor, setEditColor] = useState("#7c5cbf");
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const dragIdxRef = useRef(null);
+
+  const getName = item => noColor ? item : item.name;
 
   const add = () => {
     const n=newItem.trim();
-    if(!n||items.some(i=>i.name===n)) return;
-    onChange([...items,{name:n,color:newColor}]);
+    if(!n||items.some(i=>getName(i)===n)) return;
+    onChange([...items, noColor ? n : {name:n, color:newColor}]);
     setNewItem("");
   };
   const remove = idx => onChange(items.filter((_,i)=>i!==idx));
-  const startEdit = idx => { setEditingIdx(idx); setEditVal(items[idx].name); setEditColor(items[idx].color); };
+  const startEdit = idx => { setEditingIdx(idx); setEditVal(getName(items[idx])); if(!noColor) setEditColor(items[idx].color); };
   const saveEdit = () => {
     const n=editVal.trim(); if(!n) return;
-    const oldName=items[editingIdx].name;
-    onChange(items.map((v,i)=>i===editingIdx?{name:n,color:editColor}:v));
+    const oldName=getName(items[editingIdx]);
+    onChange(items.map((v,i)=>i===editingIdx ? (noColor ? n : {name:n,color:editColor}) : v));
     if(onRename&&oldName!==n) onRename(oldName,n);
     setEditingIdx(null);
   };
-  const moveUp   = idx => { if(idx===0) return; const a=[...items]; [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; onChange(a); };
-  const moveDown = idx => { if(idx===items.length-1) return; const a=[...items]; [a[idx],a[idx+1]]=[a[idx+1],a[idx]]; onChange(a); };
+
+  const handleDragStart = idx => { dragIdxRef.current = idx; };
+  const handleDragOver  = (e, idx) => { e.preventDefault(); setDragOverIdx(idx); };
+  const handleDrop      = (e, toIdx) => {
+    e.preventDefault();
+    const fromIdx = dragIdxRef.current;
+    if(fromIdx===null||fromIdx===toIdx) { setDragOverIdx(null); return; }
+    const a=[...items];
+    const [moved]=a.splice(fromIdx,1);
+    a.splice(toIdx,0,moved);
+    onChange(a);
+    dragIdxRef.current=null; setDragOverIdx(null);
+  };
+  const handleDragEnd   = () => { dragIdxRef.current=null; setDragOverIdx(null); };
 
   return (
     <div>
       <div style={{ padding:"12px 24px", borderBottom:"1px solid #1e1630", display:"flex", gap:8, alignItems:"center" }}>
-        <ColorSwatch color={newColor} onChange={setNewColor}/>
+        {!noColor && <ColorSwatch color={newColor} onChange={setNewColor}/>}
         <input placeholder={placeholder||"New entry…"} value={newItem} onChange={e=>setNewItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} style={{...inputStyle,flex:1,fontSize:13}}/>
         <button onClick={add} style={{...btnPrimary,fontSize:12,padding:"6px 14px"}}>+ Add</button>
       </div>
       {items.length===0&&<div style={{ padding:"12px 24px", color:"#5a4a7a", fontSize:13 }}>No entries yet.</div>}
       {items.map((item,idx)=>(
-        <div key={idx} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 24px", borderBottom:"1px solid #1e1630" }}>
+        <div key={idx}
+          draggable={editingIdx!==idx}
+          onDragStart={()=>handleDragStart(idx)}
+          onDragOver={e=>handleDragOver(e,idx)}
+          onDrop={e=>handleDrop(e,idx)}
+          onDragEnd={handleDragEnd}
+          style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 24px", borderBottom:"1px solid #1e1630", background:dragOverIdx===idx?"#1e1a30":"transparent", transition:"background .1s" }}>
           {editingIdx===idx ? (
             <>
-              <ColorSwatch color={editColor} onChange={setEditColor}/>
+              {!noColor && <ColorSwatch color={editColor} onChange={setEditColor}/>}
               <input value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingIdx(null); }} style={{...inputStyle,flex:1,fontSize:13}} autoFocus/>
               <button onClick={saveEdit} style={{...btnPrimary,fontSize:12,padding:"4px 10px"}}>Save</button>
               <button onClick={()=>setEditingIdx(null)} style={{...btnSecondary,fontSize:12,padding:"4px 8px"}}>✕</button>
             </>
           ) : (
             <>
-              <div style={{ width:14, height:14, borderRadius:3, background:item.color, flexShrink:0, border:"1px solid #3a2a5a" }}/>
-              <span style={{ flex:1, color:"#e8d5b7", fontSize:13 }}>{item.name}</span>
-              <button onClick={()=>moveUp(idx)} style={{...iconBtn,opacity:idx===0?0.25:1}} disabled={idx===0} title="Move up">▲</button>
-              <button onClick={()=>moveDown(idx)} style={{...iconBtn,opacity:idx===items.length-1?0.25:1}} disabled={idx===items.length-1} title="Move down">▼</button>
+              <span style={{ color:"#3a2a5a", fontSize:14, cursor:"grab", userSelect:"none", flexShrink:0 }} title="Drag to reorder">⠿</span>
+              {!noColor && <div style={{ width:14, height:14, borderRadius:3, background:item.color, flexShrink:0, border:"1px solid #3a2a5a" }}/>}
+              <span style={{ flex:1, color:"#e8d5b7", fontSize:13 }}>{getName(item)}</span>
               <button onClick={()=>startEdit(idx)} style={iconBtn}>✏️</button>
               <button onClick={()=>remove(idx)} style={{...iconBtn,color:"#c06060"}}>🗑️</button>
             </>
@@ -935,8 +958,56 @@ function SimpleListEditor({ items, onChange, placeholder, onRename }) {
   );
 }
 
+// ── Era List Editor ───────────────────────────────────────────────────────────
+function EraListEditor({ eras, onChange }) {
+  const [newName, setNewName] = useState("");
+  const update = (id, field, val) => onChange(eras.map(e => e.id === id ? { ...e, [field]: val } : e));
+  const addEra = () => {
+    const n = newName.trim();
+    if (!n) return;
+    onChange([...eras, { ...defaultEra, id: uid(), name: n, color: "#7c5cbf" }]);
+    setNewName("");
+  };
+  const deleteEra = id => onChange(eras.filter(e => e.id !== id));
+  const inp = { background:"transparent", border:"1px solid #2a1f3d", borderRadius:4, padding:"4px 8px", color:"#c8b8e8", fontSize:13, outline:"none" };
+  return (
+    <div style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden" }}>
+      <div style={{ padding:"14px 24px", borderBottom:"1px solid #2a1f3d" }}>
+        <div style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>⏳ Eras</div>
+        <div style={{ color:"#5a4a7a", fontSize:12, marginTop:2 }}>{eras.length} era{eras.length!==1?"s":""} defined</div>
+      </div>
+      <div style={{ padding:"14px 24px", display:"flex", flexDirection:"column", gap:8 }}>
+        {eras.map(era => (
+          <div key={era.id} style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <input type="color" value={era.color} onChange={e => update(era.id,"color",e.target.value)}
+              style={{ width:28, height:28, border:"none", background:"none", cursor:"pointer", padding:0, flexShrink:0 }}/>
+            <input value={era.name} onChange={e => update(era.id,"name",e.target.value)}
+              placeholder="Era name…" style={{ ...inp, flex:2 }}/>
+            <input value={era.startYear} onChange={e => update(era.id,"startYear",e.target.value)}
+              placeholder="Start yr" style={{ ...inp, flex:1, minWidth:60 }}/>
+            <span style={{ color:"#5a4a7a", fontSize:13 }}>→</span>
+            <input value={era.endYear} onChange={e => update(era.id,"endYear",e.target.value)}
+              placeholder="End yr" style={{ ...inp, flex:1, minWidth:60 }}/>
+            <button onClick={() => deleteEra(era.id)}
+              style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:16, padding:"2px 4px", lineHeight:1, flexShrink:0 }}
+              onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>🗑️</button>
+          </div>
+        ))}
+        <div style={{ display:"flex", gap:8, marginTop:4 }}>
+          <input value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter") addEra(); }}
+            placeholder="New era name (e.g. Age of Dragons)…"
+            style={{ ...inp, flex:1 }}/>
+          <button onClick={addEra}
+            style={{ background:"#2a1f3d", border:"1px solid #3a2a5a", borderRadius:6, color:"#c8a96e", cursor:"pointer", fontSize:13, padding:"4px 14px", fontWeight:600 }}>+ Add</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Settings Tab ──────────────────────────────────────────────────────────────
-function SettingsTab({ races, setRaces, charStatuses, setCharStatuses, relationshipTypes, setRelationshipTypes, storyStatuses, setStoryStatuses, hookStatuses, setHookStatuses, setChars }) {
+function SettingsTab({ races, setRaces, charStatuses, setCharStatuses, relationshipTypes, setRelationshipTypes, storyStatuses, setStoryStatuses, hookStatuses, setHookStatuses, locationTypes, setLocationTypes, rarities, setRarities, deityAlignments, setDeityAlignments, setChars, eras, setEras }) {
   const [dataPath, setDataPath] = useState(null);
   useEffect(() => {
     window.electronAPI?.getDataPath().then(p => setDataPath(p)).catch(()=>{});
@@ -994,6 +1065,38 @@ function SettingsTab({ races, setRaces, charStatuses, setCharStatuses, relations
           <SimpleListEditor items={hookStatuses} onChange={setHookStatuses} placeholder="New status…"/>
         </div>
       </div>
+
+      <div style={{ display:"flex", gap:20, marginBottom:28 }}>
+        <div style={{ flex:1, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"14px 24px", borderBottom:"1px solid #2a1f3d" }}>
+            <div style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>📍 Location Types</div>
+            <div style={{ color:"#5a4a7a", fontSize:12, marginTop:2 }}>{locationTypes.length} types</div>
+          </div>
+          <SimpleListEditor items={locationTypes} onChange={setLocationTypes} placeholder="New type (e.g. Swamp)…" noColor/>
+        </div>
+        <div style={{ flex:1, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"14px 24px", borderBottom:"1px solid #2a1f3d" }}>
+            <div style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>⚗️ Item Rarities</div>
+            <div style={{ color:"#5a4a7a", fontSize:12, marginTop:2 }}>{rarities.length} rarities</div>
+          </div>
+          <SimpleListEditor items={rarities} onChange={setRarities} placeholder="New rarity (e.g. Mythic)…"/>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:20, marginBottom:28 }}>
+        <div style={{ flex:1, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"14px 24px", borderBottom:"1px solid #2a1f3d" }}>
+            <div style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>⛪ Deity Alignments</div>
+            <div style={{ color:"#5a4a7a", fontSize:12, marginTop:2 }}>{deityAlignments.length} alignments</div>
+          </div>
+          <SimpleListEditor items={deityAlignments} onChange={setDeityAlignments} placeholder="New alignment (e.g. Chaotic)…"/>
+        </div>
+        <div style={{ flex:1 }}/>
+      </div>
+
+      <h2 style={{ fontFamily:"Georgia,serif", color:"#c8a96e", fontSize:18, margin:"28px 0 14px" }}>⏳ Timeline Eras</h2>
+      <p style={{ color:"#5a4a7a", fontSize:13, margin:"0 0 16px" }}>Define named time periods to group events on the visual timeline.</p>
+      <EraListEditor eras={eras} onChange={setEras}/>
 
       <h2 style={{ fontFamily:"Georgia,serif", color:"#c8a96e", fontSize:18, margin:"0 0 14px" }}>🧬 Races</h2>
       <div style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden", marginBottom:28 }}>
@@ -1071,12 +1174,12 @@ function SettingsTab({ races, setRaces, charStatuses, setCharStatuses, relations
 
 // ── Constants (outside component — never re-created) ─────────────────────────
 const TABS = [
-  {id:"characters",label:"👥 Characters"},{id:"stories",label:"📜 Stories"},
-  {id:"factions",label:"⚑ Factions"},{id:"items",label:"⚗️ Items"},
-  {id:"timeline",label:"⏳ Timeline"},{id:"locations",label:"📍 Locations"},
-  {id:"map",label:"🗺️ Map"},{id:"lore",label:"🏛️ Lore"},{id:"notes",label:"📝 Notes"},{id:"gallery",label:"🖼️ Gallery"},
+  {id:"characters",label:"👥 Characters",icon:"👥"},{id:"stories",label:"📜 Stories",icon:"📜"},
+  {id:"factions",label:"🚩 Factions",icon:"🚩"},{id:"items",label:"⚗️ Items",icon:"⚗️"},
+  {id:"timeline",label:"⏳ Timeline",icon:"⏳"},{id:"locations",label:"📍 Locations",icon:"📍"},
+  {id:"map",label:"🗺️ Map",icon:"🗺️"},{id:"lore",label:"🏛️ Lore",icon:"🏛️"},{id:"notes",label:"📝 Notes",icon:"📝"},{id:"gallery",label:"🖼️ Gallery",icon:"🖼️"},
 ];
-const ALL_TABS = [...TABS, {id:"settings",label:"⚙️ Settings"}];
+const ALL_TABS = [...TABS, {id:"settings",label:"⚙️ Settings",icon:"⚙️"}];
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -1088,10 +1191,15 @@ export default function App() {
   const [relationshipTypes, setRelationshipTypes, relTypesRef]       = useStateWithRef(DEFAULT_RELATIONSHIP_TYPES);
   const [storyStatuses,     setStoryStatuses,     storyStatusesRef]  = useStateWithRef(DEFAULT_STORY_STATUSES);
   const [hookStatuses,      setHookStatuses,      hookStatusesRef]   = useStateWithRef(DEFAULT_HOOK_STATUSES);
+  const [locationTypes,     setLocationTypes,     locationTypesRef]  = useStateWithRef(DEFAULT_LOCATION_TYPES);
+  const [rarities,          setRarities,          raritiesRef]       = useStateWithRef(DEFAULT_RARITIES);
+  const [deityAlignments,   setDeityAlignments,   deityAlignmentsRef]= useStateWithRef(DEFAULT_DEITY_ALIGNMENTS);
+  const [eras,              setEras,              erasRef]           = useStateWithRef([]);
   const [factions,          setFactions,          factionsRef]       = useStateWithRef([]);
   const [locations,         setLocations,         locationsRef]      = useStateWithRef([]);
   const [notes,             setNotes,             notesRef]          = useStateWithRef({ scratch:"", sessions:[], pins:[], playerPins:{} });
   const [loreEvents,        setLoreEvents,        loreEventsRef]     = useStateWithRef([]);
+  const [deities,           setDeities,           deitiesRef]        = useStateWithRef([]);
   const [relations,         setRelations,         relationsRef]      = useStateWithRef({ nodes:[], edges:[] });
   const [artifacts,         setArtifacts,         artifactsRef]      = useStateWithRef([]);
   const [mapData,           setMapData,           mapDataRef]        = useStateWithRef({ maps: [] });
@@ -1169,6 +1277,8 @@ export default function App() {
   const [campaigns, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [campaignManagerOpen, setCampaignManagerOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("wb_sidebar") === "1");
+  useEffect(() => { localStorage.setItem("wb_sidebar", sidebarCollapsed ? "1" : "0"); }, [sidebarCollapsed]);
 
   const askConfirm = useCallback((message, onConfirm) => setConfirm({message, onConfirm}), []);
   const closeConfirm = useCallback(() => setConfirm(null), []);
@@ -1186,10 +1296,12 @@ export default function App() {
     const snap = {
       chars: charsRef.current, stories: storiesRef.current,
       factions: factionsRef.current, locations: locationsRef.current,
-      artifacts: artifactsRef.current, loreEvents: loreEventsRef.current,
+      artifacts: artifactsRef.current, loreEvents: loreEventsRef.current, deities: deitiesRef.current,
       relations: relationsRef.current, races: racesRef.current,
       charStatuses: charStatusesRef.current, relationshipTypes: relTypesRef.current,
       storyStatuses: storyStatusesRef.current, hookStatuses: hookStatusesRef.current,
+      locationTypes: locationTypesRef.current, rarities: raritiesRef.current, deityAlignments: deityAlignmentsRef.current,
+      eras: erasRef.current,
       mapData: mapDataRef.current, notes: notesRef.current,
     };
     historyRef.current = [...historyRef.current.slice(-MAX_HISTORY + 1), snap];
@@ -1203,10 +1315,15 @@ export default function App() {
     setHistoryLen(historyRef.current.length);
     setChars(snap.chars); setStories(snap.stories); setFactions(snap.factions);
     setLocations(snap.locations); setArtifacts(snap.artifacts); setLoreEvents(snap.loreEvents);
+    if (snap.deities !== undefined) setDeities(snap.deities);
     setRelations(snap.relations); setRaces(snap.races);
     setCharStatuses(snap.charStatuses); setRelationshipTypes(snap.relationshipTypes);
     if (snap.storyStatuses !== undefined) setStoryStatuses(snap.storyStatuses);
     if (snap.hookStatuses !== undefined) setHookStatuses(snap.hookStatuses);
+    if (snap.locationTypes !== undefined) setLocationTypes(snap.locationTypes);
+    if (snap.rarities !== undefined) setRarities(snap.rarities);
+    if (snap.deityAlignments !== undefined) setDeityAlignments(snap.deityAlignments);
+    if (snap.eras !== undefined) setEras(snap.eras);
     if (snap.mapData !== undefined) setMapData(snap.mapData);
     if (snap.notes !== undefined) setNotes(snap.notes);
     showToast("Undone", "undo");
@@ -1270,11 +1387,16 @@ export default function App() {
     const lrt  = (blob.relationshipTypes||DEFAULT_RELATIONSHIP_TYPES).map(x=>typeof x==="string"?{name:x,color:RELATIONSHIP_COLORS[x]||"#3a4a6a"}:x);
     const lss  = blob.storyStatuses || DEFAULT_STORY_STATUSES;
     const lhs  = blob.hookStatuses || DEFAULT_HOOK_STATUSES;
+    const llt  = blob.locationTypes || DEFAULT_LOCATION_TYPES;
+    const lrar = blob.rarities || DEFAULT_RARITIES;
     setChars(lc); setStories(ls); setRaces(lr); setFactions(lf); setLocations(lloc);
     setNotes(blob.notes||{scratch:"",sessions:[],pins:[],playerPins:{}});
-    setLoreEvents(blob.loreEvents||[]); setRelations(blob.relations||{nodes:[],edges:[]}); setArtifacts(blob.artifacts||[]);
+    setLoreEvents(blob.loreEvents||[]); setDeities(blob.deities||[]); setRelations(blob.relations||{nodes:[],edges:[]}); setArtifacts(blob.artifacts||[]);
     setGalleryEntries(blob.galleryEntries||[]);
     setCharStatuses(lcs); setRelationshipTypes(lrt); setStoryStatuses(lss); setHookStatuses(lhs);
+    setLocationTypes(llt); setRarities(lrar);
+    setDeityAlignments(blob.deityAlignments || DEFAULT_DEITY_ALIGNMENTS);
+    setEras(blob.eras||[]);
     {
       let md = blob.mapData || { maps: [] };
       // Migrate legacy format {image, pins} → {maps:[...]}
@@ -1352,13 +1474,13 @@ export default function App() {
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       const blob = {
-        chars, stories, races, factions, locations, notes, loreEvents, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, mapData, galleryEntries,
+        chars, stories, races, factions, locations, notes, loreEvents, deities, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, locationTypes, rarities, deityAlignments, eras, mapData, galleryEntries,
         nav: { tab: pg.tab, prevTab: pg.prevTab, selectedCharId: pg.selectedCharId||null, selectedStoryId: pg.selectedStoryId||null, selectedFactionId: pg.selectedFactionId||null, selectedLocationId: pg.selectedLocationId||null },
       };
       try { await store.set(`fwb_campaign_${activeCampaignId}`, JSON.stringify(blob)); } catch {}
     }, 500);
     return () => clearTimeout(saveTimerRef.current);
-  }, [chars, stories, races, factions, locations, notes, loreEvents, relations, artifacts, charStatuses, relationshipTypes, mapData, galleryEntries, pg, loaded, activeCampaignId]); // eslint-disable-line
+  }, [chars, stories, races, factions, locations, notes, loreEvents, deities, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, locationTypes, rarities, deityAlignments, eras, mapData, galleryEntries, pg, loaded, activeCampaignId]); // eslint-disable-line
 
   const updateChar = useCallback(updated => { pushHistory(); setChars(prev => prev.map(c => c.id===updated.id ? updated : c)); }, [pushHistory]);
 
@@ -1554,6 +1676,7 @@ export default function App() {
   const updateArtifacts = useCallback(u => { pushHistory(); setArtifacts(u); }, [pushHistory]);
   const updateRelations = useCallback(u => { pushHistory(); setRelations(u); }, [pushHistory]);
   const updateLoreEvents = useCallback(u => { pushHistory(); setLoreEvents(u); }, [pushHistory]);
+  const updateDeities = useCallback(u => { pushHistory(); setDeities(u); }, [pushHistory]);
   const updateRaces = useCallback(u => { pushHistory(); setRaces(u); }, [pushHistory]);
   const updateCharStatuses = useCallback(u => { pushHistory(); setCharStatuses(u); }, [pushHistory]);
   const updateRelationshipTypes = useCallback(u => { pushHistory(); setRelationshipTypes(u); }, [pushHistory]);
@@ -1565,8 +1688,10 @@ export default function App() {
   // ── Campaign management ───────────────────────────────────────────────────────
   const resetWorldState = useCallback(() => {
     setChars([]); setStories([]); setRaces(DEFAULT_RACES); setFactions([]); setLocations([]);
-    setNotes({scratch:"",sessions:[],pins:[],playerPins:{}}); setLoreEvents([]); setRelations({nodes:[],edges:[]}); setArtifacts([]);
+    setNotes({scratch:"",sessions:[],pins:[],playerPins:{}}); setLoreEvents([]); setDeities([]); setRelations({nodes:[],edges:[]}); setArtifacts([]);
     setCharStatuses(DEFAULT_CHAR_STATUSES); setRelationshipTypes(DEFAULT_RELATIONSHIP_TYPES);
+    setLocationTypes(DEFAULT_LOCATION_TYPES); setRarities(DEFAULT_RARITIES); setDeityAlignments(DEFAULT_DEITY_ALIGNMENTS);
+    setEras([]);
     setMapData({maps:[]});
     setPages([{ id: "tab-1", ...DEFAULT_PAGE }]); setActivePageId("tab-1");
     historyRef.current = []; setHistoryLen(0);
@@ -1576,9 +1701,12 @@ export default function App() {
     const blob = {
       chars: charsRef.current, stories: storiesRef.current, races: racesRef.current,
       factions: factionsRef.current, locations: locationsRef.current, notes: notesRef.current,
-      loreEvents: loreEventsRef.current, relations: relationsRef.current, artifacts: artifactsRef.current,
-      charStatuses: charStatusesRef.current, relationshipTypes: relTypesRef.current, mapData: mapDataRef.current,
-      galleryEntries: galleryEntriesRef.current,
+      loreEvents: loreEventsRef.current, deities: deitiesRef.current, relations: relationsRef.current, artifacts: artifactsRef.current,
+      charStatuses: charStatusesRef.current, relationshipTypes: relTypesRef.current,
+      storyStatuses: storyStatusesRef.current, hookStatuses: hookStatusesRef.current,
+      locationTypes: locationTypesRef.current, rarities: raritiesRef.current, deityAlignments: deityAlignmentsRef.current,
+      eras: erasRef.current,
+      mapData: mapDataRef.current, galleryEntries: galleryEntriesRef.current,
       nav: { tab: pg.tab, prevTab: pg.prevTab, selectedCharId: pg.selectedCharId||null, selectedStoryId: pg.selectedStoryId||null, selectedFactionId: pg.selectedFactionId||null, selectedLocationId: pg.selectedLocationId||null },
     };
     try { await store.set(`fwb_campaign_${campaignId}`, JSON.stringify(blob)); } catch {}
@@ -1710,49 +1838,101 @@ export default function App() {
   return (
     <GalleryContext.Provider value={{ openGallery }}>
     <div style={{ display:"flex", height:"100vh", width:"100vw", background:"#0d0b14", color:"#e8d5b7", fontFamily:"system-ui,sans-serif" }}>
-      <div style={{ width:200, background:"#110e1c", borderRight:"1px solid #2a1f3d", display:"flex", flexDirection:"column", flexShrink:0 }}>
-        <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #2a1f3d" }}>
-          <div style={{ fontSize:20, fontFamily:"Georgia,serif", color:"#c8a96e", lineHeight:1.2 }}>⚗️ World<br/>Builder</div>
-          <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.5.0</div>
-          <button onClick={()=>setCampaignManagerOpen(true)}
-            style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"6px 9px", cursor:"pointer", textAlign:"left", transition:"border-color .15s" }}
-            onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
-            onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>
-            <span style={{ fontSize:11 }}>🗂️</span>
-            <span style={{ flex:1, fontSize:12, color:"#c8a96e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{activeCampaign?.name||"Campaign"}</span>
-            <span style={{ fontSize:10, color:"#5a4a7a" }}>▾</span>
-          </button>
-        </div>
-        <nav style={{ padding:"12px 8px", flex:1, overflowY:"auto" }}>
-          <button onClick={() => setSearchOpen(true)} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", textAlign:"left", padding:"8px 12px", borderRadius:8, border:"1px solid #2a1f3d", background:"#0d0b14", color:"#4a3a6a", cursor:"pointer", marginBottom:10, fontSize:13 }}>
-            <span>🔍</span><span style={{ flex:1 }}>Search…</span><kbd style={{ fontSize:10, background:"#1a1228", border:"1px solid #2a1f3d", borderRadius:3, padding:"1px 4px" }}>Ctrl K</kbd>
-          </button>
-          {TABS.map(t=>(
-            <button key={t.id} onClick={e=>{ if(e.ctrlKey){ addPage(t.id); } else { navigateTo(t.id); } }} style={{ display:"block", width:"100%", textAlign:"left", padding:"10px 12px", borderRadius:8, border:"none", background:tab===t.id?"#7c5cbf33":"transparent", color:tab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", marginBottom:4, fontSize:14, fontWeight:tab===t.id?700:400, borderLeft:tab===t.id?"3px solid #7c5cbf":"3px solid transparent" }}>
-              {t.label}
-            </button>
-          ))}
-          <div style={{ borderTop:"1px solid #2a1f3d", marginTop:8, paddingTop:8 }}>
-            <button onClick={e=>{ if(e.ctrlKey){ addPage("settings"); } else { navigateTo("settings"); } }} style={{ display:"block", width:"100%", textAlign:"left", padding:"10px 12px", borderRadius:8, border:"none", background:tab==="settings"?"#7c5cbf33":"transparent", color:tab==="settings"?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:14, fontWeight:tab==="settings"?700:400, borderLeft:tab==="settings"?"3px solid #7c5cbf":"3px solid transparent" }}>
-              ⚙️ Settings
-            </button>
-          </div>
-        </nav>
-        <div style={{ padding:"8px 12px", borderTop:"1px solid #2a1f3d", display:"flex", flexDirection:"column", gap:6 }}>
-          <button onClick={()=>setHelpOpen(true)} title="Keyboard shortcuts & help"
-            style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:"#9a7fa0", cursor:"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
-            onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
-            onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>
-            ? <span>Help & Shortcuts</span>
-          </button>
-          <button onClick={undo} disabled={historyLen===0} title="Undo (Ctrl+Z)"
-            style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
-            onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
-            onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color=historyLen===0?"#3a2a5a":"#9a7fa0"; }}>
-            ↩ <span>Undo{historyLen>0?` (${historyLen})`:""}</span>
-          </button>
-        </div>
-        <SaveLoadBar chars={chars} stories={stories} races={races} factions={factions} locations={locations} artifacts={artifacts} loreEvents={loreEvents} relations={relations} notes={notes} mapData={mapData} onImport={handleImport} showToast={showToast}/>
+      <div style={{ width:sidebarCollapsed?52:200, background:"#110e1c", borderRight:"1px solid #2a1f3d", display:"flex", flexDirection:"column", flexShrink:0, transition:"width .18s ease", overflow:"hidden" }}>
+        {sidebarCollapsed ? (
+          /* ── Collapsed sidebar ── */
+          <>
+            <div style={{ padding:"14px 0 10px", borderBottom:"1px solid #2a1f3d", display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+              <div style={{ fontSize:18, color:"#c8a96e" }} title="World Builder">⚗️</div>
+              <button onClick={()=>setSidebarCollapsed(false)} title="Expand sidebar"
+                style={{ width:34, height:28, display:"flex", alignItems:"center", justifyContent:"center", background:"#1a1228", border:"1px solid #7c5cbf", borderRadius:6, color:"#c8a96e", cursor:"pointer", fontSize:15, fontWeight:700, transition:"background .15s, border-color .15s" }}
+                onMouseEnter={e=>{ e.currentTarget.style.background="#2a1a4a"; e.currentTarget.style.borderColor="#a07fe8"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.background="#1a1228"; e.currentTarget.style.borderColor="#7c5cbf"; }}>›</button>
+              <button onClick={()=>setCampaignManagerOpen(true)} title={activeCampaign?.name||"Campaign"}
+                style={{ background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"5px", cursor:"pointer", fontSize:14, lineHeight:1, width:34, textAlign:"center", transition:"border-color .15s" }}
+                onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
+                onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>🗂️</button>
+            </div>
+            <nav style={{ flex:1, overflowY:"auto", padding:"8px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+              <button onClick={()=>setSearchOpen(true)} title="Search… (Ctrl+K)"
+                style={{ width:34, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"#0d0b14", border:"1px solid #2a1f3d", borderRadius:6, cursor:"pointer", fontSize:14, marginBottom:6, flexShrink:0 }}>🔍</button>
+              {TABS.map(t=>(
+                <button key={t.id} title={t.label.replace(/^\S+\s/,"")} onClick={e=>{ if(e.ctrlKey){ addPage(t.id); } else { navigateTo(t.id); } }}
+                  style={{ width:34, height:32, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:7, border:"none", background:tab===t.id?"#7c5cbf33":"transparent", cursor:"pointer", fontSize:16, flexShrink:0, borderLeft:tab===t.id?"3px solid #7c5cbf":"3px solid transparent", transition:"background .12s" }}>
+                  {t.icon}
+                </button>
+              ))}
+              <div style={{ borderTop:"1px solid #2a1f3d", marginTop:6, paddingTop:6, width:34 }}>
+                <button title="Settings" onClick={e=>{ if(e.ctrlKey){ addPage("settings"); } else { navigateTo("settings"); } }}
+                  style={{ width:34, height:32, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:7, border:"none", background:tab==="settings"?"#7c5cbf33":"transparent", cursor:"pointer", fontSize:16, borderLeft:tab==="settings"?"3px solid #7c5cbf":"3px solid transparent" }}>
+                  ⚙️
+                </button>
+              </div>
+            </nav>
+            <div style={{ padding:"8px 0", borderTop:"1px solid #2a1f3d", display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+              <button onClick={()=>setHelpOpen(true)} title="Help & Shortcuts"
+                style={{ width:34, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, color:"#9a7fa0", cursor:"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>?</button>
+              <button onClick={undo} disabled={historyLen===0} title={`Undo (Ctrl+Z)${historyLen>0?` — ${historyLen} step${historyLen!==1?"s":""} available`:""}`}
+                style={{ width:34, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
+                onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color=historyLen===0?"#3a2a5a":"#9a7fa0"; }}>↩</button>
+            </div>
+          </>
+        ) : (
+          /* ── Expanded sidebar ── */
+          <>
+            <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #2a1f3d" }}>
+              <div style={{ fontSize:20, fontFamily:"Georgia,serif", color:"#c8a96e", lineHeight:1.2 }}>⚗️ World<br/>Builder</div>
+              <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.5.0</div>
+              <button onClick={()=>setSidebarCollapsed(true)}
+                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:5, width:"100%", background:"#1a1228", border:"1px solid #7c5cbf", borderRadius:6, padding:"6px 10px", color:"#c8a96e", cursor:"pointer", fontSize:13, fontWeight:600, marginBottom:8, transition:"background .15s, border-color .15s" }}
+                onMouseEnter={e=>{ e.currentTarget.style.background="#2a1a4a"; e.currentTarget.style.borderColor="#a07fe8"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.background="#1a1228"; e.currentTarget.style.borderColor="#7c5cbf"; }}>
+                <span style={{ fontSize:15, lineHeight:1 }}>‹</span> Fold
+              </button>
+              <button onClick={()=>setCampaignManagerOpen(true)}
+                style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"6px 9px", cursor:"pointer", textAlign:"left", transition:"border-color .15s" }}
+                onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
+                onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>
+                <span style={{ fontSize:11 }}>🗂️</span>
+                <span style={{ flex:1, fontSize:12, color:"#c8a96e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{activeCampaign?.name||"Campaign"}</span>
+                <span style={{ fontSize:10, color:"#5a4a7a" }}>▾</span>
+              </button>
+            </div>
+            <nav style={{ padding:"12px 8px", flex:1, overflowY:"auto" }}>
+              <button onClick={() => setSearchOpen(true)} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", textAlign:"left", padding:"8px 12px", borderRadius:8, border:"1px solid #2a1f3d", background:"#0d0b14", color:"#4a3a6a", cursor:"pointer", marginBottom:10, fontSize:13 }}>
+                <span>🔍</span><span style={{ flex:1 }}>Search…</span><kbd style={{ fontSize:10, background:"#1a1228", border:"1px solid #2a1f3d", borderRadius:3, padding:"1px 4px" }}>Ctrl K</kbd>
+              </button>
+              {TABS.map(t=>(
+                <button key={t.id} onClick={e=>{ if(e.ctrlKey){ addPage(t.id); } else { navigateTo(t.id); } }} style={{ display:"block", width:"100%", textAlign:"left", padding:"10px 12px", borderRadius:8, border:"none", background:tab===t.id?"#7c5cbf33":"transparent", color:tab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", marginBottom:4, fontSize:14, fontWeight:tab===t.id?700:400, borderLeft:tab===t.id?"3px solid #7c5cbf":"3px solid transparent" }}>
+                  {t.label}
+                </button>
+              ))}
+              <div style={{ borderTop:"1px solid #2a1f3d", marginTop:8, paddingTop:8 }}>
+                <button onClick={e=>{ if(e.ctrlKey){ addPage("settings"); } else { navigateTo("settings"); } }} style={{ display:"block", width:"100%", textAlign:"left", padding:"10px 12px", borderRadius:8, border:"none", background:tab==="settings"?"#7c5cbf33":"transparent", color:tab==="settings"?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:14, fontWeight:tab==="settings"?700:400, borderLeft:tab==="settings"?"3px solid #7c5cbf":"3px solid transparent" }}>
+                  ⚙️ Settings
+                </button>
+              </div>
+            </nav>
+            <div style={{ padding:"8px 12px", borderTop:"1px solid #2a1f3d", display:"flex", flexDirection:"column", gap:6 }}>
+              <button onClick={()=>setHelpOpen(true)} title="Keyboard shortcuts & help"
+                style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:"#9a7fa0", cursor:"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
+                onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>
+                ? <span>Help & Shortcuts</span>
+              </button>
+              <button onClick={undo} disabled={historyLen===0} title="Undo (Ctrl+Z)"
+                style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
+                onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color=historyLen===0?"#3a2a5a":"#9a7fa0"; }}>
+                ↩ <span>Undo{historyLen>0?` (${historyLen})`:""}</span>
+              </button>
+            </div>
+            <SaveLoadBar chars={chars} stories={stories} races={races} factions={factions} locations={locations} artifacts={artifacts} loreEvents={loreEvents} relations={relations} notes={notes} mapData={mapData} onImport={handleImport} showToast={showToast}/>
+          </>
+        )}
       </div>
 
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
@@ -1842,7 +2022,7 @@ export default function App() {
                   onNewChar={openCharModal} onDeleteChar={deleteChar} onCancelNew={cancelNewChar}
                   onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction} onOpenChar={handleOpenChar} onOpenArtifact={handleOpenArtifactInStory}
                   onSaveChar={saveChar} onSaveFaction={saveFaction} onUpdateArtifacts={updateArtifacts}
-                  onPinCharHook={handlePinCharHook} pinnedCharHookIds={pinnedCharHookIds}/>
+                  onPinCharHook={handlePinCharHook} pinnedCharHookIds={pinnedCharHookIds} rarities={rarities}/>
               </div>
               <div style={{ display: p.tab==="stories" ? "contents" : "none" }}>
                 <StoriesTabContent
@@ -1859,7 +2039,7 @@ export default function App() {
                   onOpenChar={handleOpenChar} onOpenFaction={handleOpenFaction} onOpenLocation={handleOpenLocation}
                   onOpenArtifact={handleOpenArtifactInStory} onUpdateArtifacts={updateArtifacts}
                   onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}
-                  onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds}/>
+                  onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds} rarities={rarities}/>
               </div>
               <div style={{ display: p.tab==="factions" ? "contents" : "none" }}>
                 <FactionsTabContent
@@ -1876,7 +2056,7 @@ export default function App() {
                     <p style={{ color:"#5a4a7a", fontSize:13, margin:0 }}>All events across every story, grouped by date.</p>
                   </div>
                   <div style={{ flex:1, overflowY:"auto", padding:"0 32px 28px", minHeight:0 }}>
-                    <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar}/>
+                    <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} eras={eras} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar}/>
                   </div>
                 </div>
               </div>
@@ -1890,14 +2070,14 @@ export default function App() {
                   onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
                   onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction}
                   onShowOnMap={handleShowOnMap}
-                  isEditing={p.locationEditing} onSetEditing={v=>pageUpdPg({ locationEditing: v })}/>
+                  isEditing={p.locationEditing} onSetEditing={v=>pageUpdPg({ locationEditing: v })} locationTypes={locationTypes}/>
               </div>
-              <div style={{ display: p.tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={p.itemNavId}/></div>
-              <div style={{ display: p.tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={p.mapNavTarget}/></div>
-              <div style={{ display: p.tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}/></div></div>
+              <div style={{ display: p.tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={p.itemNavId} rarities={rarities}/></div>
+              <div style={{ display: p.tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={p.mapNavTarget} locationTypes={locationTypes}/></div>
+              <div style={{ display: p.tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} deities={deities} onUpdateDeities={updateDeities} factions={factions} locations={locations} deityAlignments={deityAlignments} eras={eras}/></div></div>
               <div style={{ display: p.tab==="gallery" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><GalleryTab images={galleryImages} galleryEntries={galleryEntries} onUpdateEntries={setGalleryEntries}/></div></div>
               <div style={{ display: p.tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTab notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onPinCharHook={handlePinCharHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} storyStatuses={storyStatuses} onUpdateStory={updateStory} onUpdateChar={updateChar}/></div></div>
-              <div style={{ display: p.tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} setChars={updateCharsFromSettings}/></div></div>
+              <div style={{ display: p.tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} locationTypes={locationTypes} setLocationTypes={setLocationTypes} rarities={rarities} setRarities={setRarities} deityAlignments={deityAlignments} setDeityAlignments={setDeityAlignments} setChars={updateCharsFromSettings} eras={eras} setEras={setEras}/></div></div>
             </div>
           );
         })}
@@ -1979,7 +2159,7 @@ export default function App() {
       {confirm&&<ConfirmDialog message={confirm.message} onConfirm={confirm.onConfirm} onCancel={closeConfirm}/>}
 
 
-      {locationModal&&<LocationModal location={locationModal} onClose={()=>setLocationModal(null)} onSave={saveLocation}/>}
+      {locationModal&&<LocationModal location={locationModal} onClose={()=>setLocationModal(null)} onSave={saveLocation} locationTypes={locationTypes}/>}
       <GlobalSearch
         open={searchOpen} onClose={() => setSearchOpen(false)}
         chars={chars} stories={stories} factions={factions} locations={locations} artifacts={artifacts}

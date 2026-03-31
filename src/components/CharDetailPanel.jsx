@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from "react";
 import ImageUploadZone from "./ImageUploadZone.jsx";
-import { inputStyle, ghostTextarea, ghostInput, selStyle, btnPrimary, btnSecondary, CHAR_STATUSES, CHAR_STATUS_COLORS, STATUS_COLORS, RELATIONSHIP_COLORS, RARITY_COLORS } from "../constants.js";
+import { inputStyle, ghostTextarea, ghostInput, selStyle, btnPrimary, btnSecondary, CHAR_STATUSES, CHAR_STATUS_COLORS, STATUS_COLORS, RELATIONSHIP_COLORS, DEFAULT_RARITIES } from "../constants.js";
 import { getRaceLabel, getFactionColor, uid, formatEventDate, sortEventsDesc } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
 import LinkBadge from "./LinkBadge.jsx";
@@ -383,7 +383,7 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
           <div style={{ fontSize:11, color:"#c8a96e", letterSpacing:1, textTransform:"uppercase", marginBottom:10 }}>✨ Notable Artifacts</div>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {artifacts.filter(a => a.holderId === char.id).map(a => {
-              const rc = RARITY_COLORS[a.rarity] || "#9a9a9a";
+              const rc = rarityColors[a.rarity] || "#9a9a9a";
               return (
                 <div key={a.id}
                   onClick={onOpenArtifact ? ()=>onOpenArtifact(a) : undefined}
@@ -451,7 +451,8 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
   );
 }
 
-function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange }) {
+function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, rarities }) {
+  const rarityColors = Object.fromEntries((rarities || DEFAULT_RARITIES).map(r => [r.name, r.color]));
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;
   const setSubTab = onSubTabChange ?? setSubTabInternal;

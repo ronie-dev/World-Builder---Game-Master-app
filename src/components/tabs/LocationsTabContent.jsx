@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { LOCATION_TYPES, btnPrimary, btnSecondary, iconBtn, inputStyle, selStyle } from "../../constants.js";
+import { btnPrimary, btnSecondary, iconBtn, inputStyle, selStyle } from "../../constants.js";
 import Avatar from "../Avatar.jsx";
 import LocationDetailPanel from "../LocationDetailPanel.jsx";
 
@@ -55,7 +55,7 @@ function LocationsTabContent({
   updPg,
   onNewLocation, onSaveLocation, onDeleteLocation,
   onOpenChar, onOpenStory, onOpenFaction, onShowOnMap,
-  isEditing, onSetEditing,
+  isEditing, onSetEditing, locationTypes,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -72,7 +72,7 @@ function LocationsTabContent({
             </div>
             <select value={locationTypeFilter} onChange={e=>updPg({locationTypeFilter:e.target.value})} style={{...selStyle,width:"auto",minWidth:130,fontSize:13}}>
               <option value="">All Types</option>
-              {LOCATION_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              {(locationTypes||[]).map(t=><option key={t} value={t}>{t}</option>)}
             </select>
             {(locationQuery||locationTypeFilter)&&<button onClick={()=>updPg({locationQuery:"",locationTypeFilter:""})} style={{...btnSecondary,fontSize:12,padding:"7px 10px",whiteSpace:"nowrap"}}>✕ Clear</button>}
           </div>
@@ -81,8 +81,9 @@ function LocationsTabContent({
             : (()=>{
                 const q=locationQuery.toLowerCase();
                 const filtered=locations.filter(l=>(!q||l.name?.toLowerCase().includes(q)||l.region?.toLowerCase().includes(q)||l.description?.toLowerCase().includes(q))&&(!locationTypeFilter||l.type===locationTypeFilter));
-                const grouped=LOCATION_TYPES.reduce((acc,t)=>{ const items=filtered.filter(l=>l.type===t); if(items.length) acc.push({type:t,items}); return acc; },[]);
-                const ungrouped=filtered.filter(l=>!l.type||!LOCATION_TYPES.includes(l.type));
+                const lt = locationTypes||[];
+                const grouped=lt.reduce((acc,t)=>{ const items=filtered.filter(l=>l.type===t); if(items.length) acc.push({type:t,items}); return acc; },[]);
+                const ungrouped=filtered.filter(l=>!l.type||!lt.includes(l.type));
                 if(ungrouped.length) grouped.push({type:"Other",items:ungrouped});
                 if(!grouped.length) return <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a", fontSize:13 }}>No locations match.</div>;
                 return grouped.map(({type,items})=>{
@@ -119,7 +120,7 @@ function LocationsTabContent({
                 onDelete={id=>{ onDeleteLocation(id); updPg({ selectedLocationId: null }); }}
                 onOpenChar={onOpenChar} onOpenStory={onOpenStory} onOpenFaction={onOpenFaction}
                 onShowOnMap={(mapData?.maps||[]).some(m=>(m.pins||[]).some(p=>p.locationId===selectedLocation.id)) ? ()=>onShowOnMap(selectedLocation) : undefined}
-                isEditing={isEditing} onSetEditing={onSetEditing}/>
+                isEditing={isEditing} onSetEditing={onSetEditing} locationTypes={locationTypes}/>
             : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📍</div>
                 <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a location to view details</div>
