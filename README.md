@@ -5,42 +5,26 @@
 A desktop app for tabletop RPG Game Masters, Writers, and Video Game Creators to manage their stories, characters, factions, locations, and world maps — all in one place.
 
 Built with **Electron + React + Vite**. All data is stored locally on your machine.
+
 <img width="529" height="442" alt="Image" src="https://github.com/user-attachments/assets/9d47f62a-4db9-4f00-b116-932317ea4971" />
+
 ---
 
-## What's New in v0.4.1
+## What's New in v0.6.0
 
-### Characters — Inline Creation
-- New characters are created directly in the detail panel — no popup modal
-- Click **+ Main** or **+ Side** to open a draft character instantly; cancel discards it without saving
+### UX — Safety & Feedback
+- **Delete confirmations** added throughout — removing a character, story, faction, location, map pin, or any linked entity now requires an inline ✓/✕ confirm; no data can be lost with a single misclick
+- **Summary strips** in Faction, Location, and Story detail headers — at-a-glance counts for members, residents, linked factions, stories, and active hooks
+- **Empty states** across all list sections with helpful copy instead of blank space
+- **Button hover transitions** applied consistently to all primary, secondary, and icon buttons
 
-### Characters — Biography Tabs
-- The Biography field is now a **tabbed text editor** — add as many custom tabs as you need
-- Rename any tab by clicking ✏️, delete with ✕ (with inline confirmation)
-
-### Characters — Hooks
-- New **🔮 Hooks** sub-tab on every character — same structure as Story hooks
-- Add potential plot threads, reminders, or GM notes tied to a specific character
-- Pin character hooks to **Pinned Reminders** — they appear with the character's avatar and a clickable link
-
-### Notes — Character Hook Pins
-- Pinned character hooks show the character portrait, character name as a link, and inline status dropdown
-- Character links in Pinned Reminders are displayed as compact **horizontal pills** (avatar + name)
-
-### Notes — Pinned Story Hooks
-- Pin any story plot hook directly to Pinned Reminders with one click
-- Pinned hooks show the story name as a clickable link and let you change hook status inline
-- Pinning and deletions are fully undoable (Ctrl+Z)
+### Command Palette
+- Type filter tabs added (All / Characters / Stories / Factions / Locations / Items / Lore)
+- Result limit raised to 60; footer always visible with keyboard hint and result count
 
 ### Bug Fixes
-- Editing a story, character, faction, or location no longer removes hooks or other data saved after the form was opened
-- Switching tabs preserves in-progress form text
-
-### QoL & Polish
-- Completed reminders now show a green highlight instead of strikethrough
-- Player cards in the Characters tab are now compact horizontal rows
-- Global search now has a ✕ close button
-- New **? Help & Shortcuts** panel in the sidebar listing all keyboard shortcuts and mouse gestures
+- Fixed transparent faction detail panel header — scrolled content was bleeding through the gradient background
+- Fixed `GalleryPicker` hover bug; picker now also closes on Escape
 
 ---
 
@@ -52,14 +36,14 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 - Create, rename, and delete campaigns with confirmation
 
 ### Characters
-- Main, Side, and Player character types with helpful empty-state prompts
+- Main, Side, and Player character types
 - Inline creation — new characters open directly in the detail panel, no popup
 - Character portrait upload with lightbox zoom
 - Details: race/subrace, class, level, alignment, origin, location, status
 - Biography with custom **tabbed text editor** — add, rename, and delete tabs
 - **🔮 Hooks** sub-tab — plot threads and GM notes per character, pinnable to Reminders
 - Relationships with other characters (typed, colored)
-- Faction memberships with roles
+- Faction memberships with roles synced to faction tiers
 - Items inventory with images and descriptions
 - Character timeline (events from linked stories)
 - Files panel for player characters
@@ -68,56 +52,61 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 ### Stories
 - Main story, Player stories, and regular stories
 - Story events with character tagging and dates; automatically sorted by date on save
-- Status tracking: Draft, Active, Completed, Abandoned
+- Status tracking with custom statuses and colors
+- **🔮 Hooks** sub-tab — plot threads and potential future scenarios, pinnable to Reminders
 - Linked characters, factions, locations, and artifacts
 - Search and status filter
-- Timeline events highlight and auto-scroll when navigated to from the session log
 
 ### Factions
-- Faction management with alignment, status, and color coding
-- Detail panel showing members and linked stories
+- Alignment, status, color coding, and logo/portrait
+- **Members** tab — drag-and-drop tier builder to organize members into named rank levels
+- Multi-tab description editor
+- Location search linked to the Locations list
 
 ### Locations
 - Grouped by type with fold/unfold
 - Search and type filter
-- Detail panel showing linked characters and stories
+- Detail panel showing linked characters, factions, and stories
 - "Show on Map" button — navigate directly to a pinned location on the World Map
 
 ### World Map
 - Upload a map image (PNG, JPG, WebP) per map
 - Place location pins linked to entries from the Locations tab
-- Pin labels shown by default with toggle (Labels On/Off), setting persists across sessions
-- Hover over a pin to reveal its name and remove button
-- Sidebar pin list — all pinned locations grouped by type with search and type filter
-- Click a sidebar entry to center the camera on that pin
-- If a location appears on multiple maps, a picker lets you choose which to open
-- Pin search with text filter and location type dropdown
-- Location type icons shown on pins and in the search list
+- Sidebar pin list — all pinned locations with search and type filter; click to center camera
 - Zoom (mouse wheel, +/− buttons) and pan (drag)
 - Multiple maps per campaign with named tabs
 
 ### Items & Artifacts
 - Rarity system: Common → Artifact
-- Image lightbox, lore/history field
-- Holder assignment and linked stories
+- Image lightbox, lore/history field, holder assignment, and linked stories
 
 ### Lore & Timeline
-- Global timeline across all stories and lore events
-- World lore event log
+- **Global Timeline** across all stories and lore events with era separators and a quick-jump scrubber bar
+- **Lore Events** tab with its own era separators and jump bar
+- Eras / Ages defined in Settings with start years and colors
 
-### Relationships
-- Visual relationship map between characters and factions
+### Gallery
+- Browse all images from characters, stories, artifacts, and lore events in one masonry grid
+- Filter by type; direct upload with name and category; delete custom entries with confirmation
+- Click any image to open a full lightbox
+
+### Command Palette
+- **Ctrl+K** — instant search across all entities
+- Type filter tabs (All / Characters / Stories / Factions / Locations / Items / Lore)
+- Keyboard navigation with Enter to open
 
 ### Notes
-- Scratch pad
-- Pinned reminders with up/down reorder buttons
-- Session log with newest entries at the top
-  - Total event count shown in the header
-  - Click a linked story event to navigate directly to it in the timeline (with highlight + scroll)
+- Scratch pad with auto-expanding textarea
+- **Pinned Reminders** — merge story hooks, character hooks, and manual notes in one drag-reorderable list
+- Session log — add sessions with dates and events; link events directly to story timeline entries
+
+### Relationships
+- Visual relationship web between characters and stories
 
 ### Settings
-- Custom character statuses with color picker
-- Custom relationship types with color picker
+- Custom character statuses, story statuses, hook statuses, relationship types — all with color pickers
+- Custom races with icons and subraces
+- Location types, item rarities, deity alignments, and eras
 
 ### Undo
 - Global undo stack (50 steps) with **Ctrl+Z**
@@ -140,8 +129,8 @@ Download the latest `.exe` installer from the [Releases](../../releases) page. N
 Requires **Node.js** (v18 or later).
 
 ```bash
-git clone https://github.com/ronie-dev/World-Building-Game-Master-App.git
-cd World-Building-Game-Master-App
+git clone https://github.com/ronie-dev/World-Builder---Game-Master-app.git
+cd World-Builder---Game-Master-app
 npm install
 npm run electron
 ```
