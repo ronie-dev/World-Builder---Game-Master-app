@@ -69,10 +69,26 @@ export const defaultDeity = { id:null, name:"", title:"", domains:[], alignment:
 
 export const defaultEra = { id: null, name: "", startYear: "", endYear: "", color: "#7c5cbf" };
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+// Surface backgrounds
+export const BG_PANEL  = "#13101f";   // darkest — panel / modal background
+export const BG_DARK   = "#1a1228";   // card / list row background
+export const BG_CARD   = "#0f0c1a";   // inset card / form background
+export const BG_CHIP   = "#1e1630";   // mini-chip / tag background
+// Text
+export const TEXT_PRIMARY = "#e8d5b7";
+export const TEXT_MUTED   = "#9a7fa0";
+export const TEXT_FAINT   = "#5a4a7a";
+export const TEXT_ACCENT  = "#c8a96e";
+// Borders
+export const BORDER        = "#3a2a5a";
+export const BORDER_SUBTLE = "#2a1f3d";
+export const BORDER_ACTIVE = "#7c5cbf";
+
 export const inputStyle = { width:"100%", background:"#0d0b14", border:"1px solid #3a2a5a", borderRadius:6, padding:"8px 10px", color:"#e8d5b7", fontSize:14, boxSizing:"border-box", outline:"none" };
 export const ghostTextarea = { width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:4, padding:"4px 6px", color:"#b09080", fontSize:14, lineHeight:1.7, boxSizing:"border-box", outline:"none", resize:"none", overflow:"hidden", fontFamily:"inherit" };
 export const ghostInput = { background:"transparent", border:"1px solid #3a2a5a", borderRadius:4, padding:"2px 6px", color:"#9a7fa0", fontSize:13, outline:"none", fontFamily:"inherit" };
 export const selStyle = { ...inputStyle };
-export const btnPrimary = { background:"linear-gradient(135deg,#5a3da0,#7c5cbf)", color:"#e8d5b7", border:"none", borderRadius:6, padding:"8px 18px", cursor:"pointer", fontWeight:700, fontSize:13 };
-export const btnSecondary = { background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 14px", cursor:"pointer", fontSize:13 };
-export const iconBtn = { background:"transparent", border:"none", cursor:"pointer", fontSize:15, padding:4, borderRadius:4 };
+export const btnPrimary = { background:"linear-gradient(135deg,#5a3da0,#7c5cbf)", color:"#e8d5b7", border:"none", borderRadius:6, padding:"8px 18px", cursor:"pointer", fontWeight:700, fontSize:13, transition:"opacity .15s, box-shadow .15s" };
+export const btnSecondary = { background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:6, padding:"8px 14px", cursor:"pointer", fontSize:13, transition:"border-color .15s, color .15s, background .15s" };
+export const iconBtn = { background:"transparent", border:"none", cursor:"pointer", fontSize:15, padding:4, borderRadius:4, transition:"color .15s, opacity .15s" };

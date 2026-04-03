@@ -3,14 +3,15 @@ import { btnPrimary, btnSecondary, inputStyle, selStyle, STATUS_COLORS } from ".
 import Avatar from "../Avatar.jsx";
 import Badge from "../Badge.jsx";
 import StoryDetailPanel from "../StoryDetailPanel.jsx";
+import { EmptyState, CardRow, MiniChip } from "../ui.jsx";
 
-function StoryCard({ story, chars, isSelected, onSelect }) {
+function StoryCard({ story, chars, factions, locations, isSelected, onSelect }) {
   const linkedChars = chars.filter(c => story.characterIds.includes(c.id) && (c.type==="main"||c.type==="player"));
   const evCount = (story.events||[]).length;
+  const facCount = (story.factionIds||[]).filter(id => (factions||[]).some(f=>f.id===id)).length;
+  const locCount = (story.locationIds||[]).filter(id => (locations||[]).some(l=>l.id===id)).length;
   return (
-    <div onClick={()=>onSelect(story)} style={{ background:isSelected?"#1e1535":"#1a1228", border:`1px solid ${isSelected?"#7c5cbf":"#3a2a5a"}`, borderRadius:10, padding:16, cursor:"pointer", transition:"border-color .15s, background .15s", userSelect:"none" }}
-      onMouseEnter={e=>{ if(!isSelected) e.currentTarget.style.borderColor="#5a3da0"; }}
-      onMouseLeave={e=>{ if(!isSelected) e.currentTarget.style.borderColor="#3a2a5a"; }}>
+    <CardRow isSelected={isSelected} onClick={()=>onSelect(story)}>
       <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
         {story.image&&<div style={{ width:56, height:56, borderRadius:6, overflow:"hidden", flexShrink:0, border:"1px solid #3a2a5a" }}><img src={story.image} alt={story.name} style={{ width:"100%", height:"100%", objectFit:"cover" }}/></div>}
         <div style={{ flex:1, minWidth:0 }}>
@@ -18,21 +19,23 @@ function StoryCard({ story, chars, isSelected, onSelect }) {
             <span style={{ color:"#e8d5b7", fontWeight:700, fontSize:15, fontFamily:"Georgia,serif" }}>{story.name}</span>
             {story.status&&<Badge label={story.status} color={STATUS_COLORS[story.status]}/>}
             {evCount>0&&<span style={{ fontSize:11, color:"#7c5cbf", background:"#7c5cbf18", borderRadius:4, padding:"2px 7px" }}>⏳ {evCount} event{evCount!==1?"s":""}</span>}
+            {facCount>0&&<span style={{ fontSize:11, color:"#9a7fa0", background:"#9a7fa018", borderRadius:4, padding:"2px 7px" }}>⚑ {facCount}</span>}
+            {locCount>0&&<span style={{ fontSize:11, color:"#9a7fa0", background:"#9a7fa018", borderRadius:4, padding:"2px 7px" }}>📍 {locCount}</span>}
           </div>
           {story.summary&&<p style={{ margin:"0 0 8px", fontSize:13, color:"#9a7fa0", lineHeight:1.5 }}>{story.summary}</p>}
           {linkedChars.length>0&&(
             <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
               {linkedChars.map(c=>(
-                <div key={c.id} style={{ display:"flex", alignItems:"center", gap:4, background:"#1e1630", borderRadius:12, padding:"2px 8px 2px 4px" }}>
+                <MiniChip key={c.id}>
                   <Avatar src={c.image} name={c.name} size={18}/><span style={{ fontSize:11, color:"#9a7fa0" }}>{c.name}</span>
-                </div>
+                </MiniChip>
               ))}
             </div>
           )}
         </div>
         {story.isMain&&<span style={{ fontSize:16, flexShrink:0 }}>⭐</span>}
       </div>
-    </div>
+    </CardRow>
   );
 }
 
@@ -72,8 +75,8 @@ function StoriesTabContent({
           <div style={{ marginBottom:24 }}>
             <h2 style={{ color:"#c8a96e", fontFamily:"Georgia,serif", margin:"0 0 12px", fontSize:17 }}>⭐ Main Story</h2>
             {mainStory
-              ? <StoryCard story={mainStory} chars={chars} isSelected={selectedStory?.id===mainStory.id} onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}/>
-              : <div style={{ textAlign:"center", padding:"20px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:8, fontSize:13 }}>No main story set.<br/><span style={{ fontSize:12 }}>Select a story and click "☆ Set Main".</span></div>}
+              ? <StoryCard story={mainStory} chars={chars} factions={factions} locations={locations} isSelected={selectedStory?.id===mainStory.id} onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}/>
+              : <div style={{ textAlign:"center", padding:"28px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:8, fontSize:13 }}>No main story set.<br/><span style={{ fontSize:12 }}>Open a story and click "☆" in its header to set it as main.</span></div>}
           </div>
           {playerStories.length>0&&(
             <>
@@ -85,10 +88,7 @@ function StoriesTabContent({
                     playerStories.filter(s=>s.playerId===player.id).map(s=>{
                       const sel=selectedStory?.id===s.id;
                       return (
-                        <div key={s.id} onClick={()=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}
-                          style={{ display:"flex", alignItems:"flex-start", gap:10, background:sel?"#1e1535":"#1a1228", border:`1px solid ${sel?"#7c5cbf":"#3a2a5a"}`, borderRadius:10, padding:"10px 14px", cursor:"pointer", transition:"border-color .15s, background .15s", flex:"1 1 220px", minWidth:0, userSelect:"none" }}
-                          onMouseEnter={e=>{ if(!sel) e.currentTarget.style.borderColor="#5a3da0"; }}
-                          onMouseLeave={e=>{ if(!sel) e.currentTarget.style.borderColor="#3a2a5a"; }}>
+                        <CardRow key={s.id} isSelected={sel} onClick={()=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"10px 14px", flex:"1 1 220px", minWidth:0 }}>
                           {s.image&&<div style={{ width:44, height:44, borderRadius:6, overflow:"hidden", flexShrink:0, border:"1px solid #3a2a5a" }}><img src={s.image} alt={s.name} style={{ width:"100%", height:"100%", objectFit:"cover" }}/></div>}
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:3 }}>
@@ -98,7 +98,7 @@ function StoriesTabContent({
                             <div style={{ color:"#e8d5b7", fontWeight:700, fontSize:13, fontFamily:"Georgia,serif", marginBottom:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{s.name}</div>
                             {s.summary&&<p style={{ margin:0, fontSize:11, color:"#9a7fa0", lineHeight:1.4, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{s.summary}</p>}
                           </div>
-                        </div>
+                        </CardRow>
                       );
                     })
                   )}
@@ -108,14 +108,14 @@ function StoriesTabContent({
           )}
           <div style={{ height:1, background:"#2a1f3d", marginBottom:24 }}/>
           <div>
-            <h2 style={{ color:"#c8a96e", fontFamily:"Georgia,serif", margin:"0 0 12px", fontSize:17 }}>📜 Stories <span style={{ fontSize:12, color:"#7c5cbf", fontFamily:"sans-serif" }}>({otherStories.length})</span></h2>
+            <h2 style={{ color:"#c8a96e", fontFamily:"Georgia,serif", margin:"0 0 12px", fontSize:17 }}>📜 Stories <span style={{ fontSize:12, color:"#7c5cbf" }}>({otherStories.length})</span></h2>
             {stories.length===0
               ? <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:8, fontSize:13 }}>No stories yet.<br/><span style={{ fontSize:12 }}>Click "+ New Story" to create your first story.</span></div>
               : otherStories.length===0
-                ? <div style={{ textAlign:"center", padding:"20px 0", color:"#5a4a7a", fontSize:13 }}>No regular stories.</div>
+                ? <div style={{ textAlign:"center", padding:"28px 0", color:"#5a4a7a", fontSize:13 }}>All stories are linked to players or set as main.</div>
                 : <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                     {otherStories.map(s=>(
-                      <StoryCard key={s.id} story={s} chars={chars} isSelected={selectedStory?.id===s.id}
+                      <StoryCard key={s.id} story={s} chars={chars} factions={factions} locations={locations} isSelected={selectedStory?.id===s.id}
                         onSelect={s=>updPg({ selectedStoryId: selectedStoryId===s.id?null:s.id, storyEditing: false })}/>
                     ))}
                   </div>}
@@ -124,6 +124,7 @@ function StoriesTabContent({
         <div style={{ flex:1, minWidth:0, overflowY:"auto" }}>
           {selectedStory
             ? <StoryDetailPanel
+                key={selectedStory.id}
                 story={selectedStory} chars={chars} factions={factions} locations={locations}
                 onClose={()=>updPg({ selectedStoryId: null })}
                 onDelete={onDeleteStory} onSetMain={onSetMain} onSetPlayerStory={onSetPlayerStory}
@@ -137,10 +138,7 @@ function StoriesTabContent({
                 currentTimelineDate={currentTimelineDate}
                 onPinHook={onPinHook} pinnedHookIds={pinnedHookIds}
                 onCancelNew={onCancelNew} rarities={rarities}/>
-            : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
-                <div style={{ fontSize:40, marginBottom:12 }}>📜</div>
-                <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a story to view details</div>
-              </div>}
+            : <EmptyState icon="📜" title="Select a story to view details"/>}
         </div>
       </div>
     </div>

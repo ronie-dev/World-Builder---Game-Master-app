@@ -114,13 +114,14 @@ function HooksTab({ story, onUpdateStory, hookStatuses, onPinHook, pinnedHookIds
 }
 
 // ── Story Loot Tab ─────────────────────────────────────────────────────────────
-function LootTab({ story, onUpdateStory, artifacts, onUpdateArtifacts, chars, onOpenChar, onOpenArtifact }) {
+function LootTab({ story, onUpdateStory, artifacts, chars, onOpenChar, onOpenArtifact, rarities }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [addingNew, setAddingNew] = useState(false);
   const [newForm, setNewForm] = useState({ name:"", description:"", value:"", image:null });
   const items = story.items || [];
   const linkedArtifacts = (artifacts || []).filter(a => (a.storyIds || []).includes(story.id));
+  const rarityColors = Object.fromEntries((rarities || DEFAULT_RARITIES).map(r => [r.name, r.color]));
 
   const saveNew = () => {
     if (!newForm.name.trim()) return;
@@ -245,9 +246,8 @@ function LootTab({ story, onUpdateStory, artifacts, onUpdateArtifacts, chars, on
   );
 }
 
-function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onCancelNew, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onUpdateArtifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds, rarities }) {
+function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds, rarities }) {
   const storyStatusList = storyStatuses || DEFAULT_STORY_STATUSES;
-  const rarityColors = Object.fromEntries((rarities || DEFAULT_RARITIES).map(r => [r.name, r.color]));
   const storyColorMap = Object.fromEntries(storyStatusList.map(s => [s.name, s.color]));
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;
@@ -269,14 +269,12 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
   const [dragOverGroupId, setDragOverGroupId] = useState(null);
   const [dragGroupId, setDragGroupId] = useState(null);
   const [dragOverGroupRowId, setDragOverGroupRowId] = useState(null);
+  const [confirmRemoveCharId, setConfirmRemoveCharId] = useState(null);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState(null);
+  const [confirmRemoveFacId, setConfirmRemoveFacId] = useState(null);
+  const [confirmRemoveLocId, setConfirmRemoveLocId] = useState(null);
 
-  useEffect(() => {
-    setEditingField(null); setFieldVal(""); setConfirmDelete(false);
-    setFacSearch(""); setLocSearch("");
-    setSectionToggles({});
-    setAddingToGroup(null); setGroupAddSearch(""); setEditingGroupId(null); setNewGroupName(""); setAddingGroup(false);
-  }, [story?.id]); // eslint-disable-line
-  useEffect(() => { if (highlightEventId) setSubTab("timeline"); }, [highlightEventId]);
+  useEffect(() => { if (highlightEventId) setSubTab("timeline"); }, [highlightEventId, setSubTab]);
   useEffect(() => {
     const handler = e => {
       if (e.key !== "Escape") return;
@@ -396,6 +394,16 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
   };
   const toggleSection = k => setSectionToggles(t => ({...t, [k]: !isSectionOpen(k)}));
 
+  const SectionHead = (key, label, { count, showEmpty } = {}) => (
+    <div onClick={()=>toggleSection(key)} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+      onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+      <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen(key)?"▼":"▶"}</span>
+      <span style={{...LABEL, marginBottom:0}}>{label}</span>
+      {count != null && count > 0 && <span style={{ fontSize:11, color:"#5a4a7a", marginLeft:4 }}>({count})</span>}
+      {showEmpty && !isSectionOpen(key) && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
+    </div>
+  );
+
   return (
     <div style={{ background:"#13101f", border:"1px solid #7c5cbf", borderRadius:12, marginBottom:20, overflow:"visible", boxShadow:"0 4px 32px #7c5cbf22", animation:"slideDown .18s ease" }}>
       <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}`}</style>
@@ -438,6 +446,11 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
           <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             {story.isMain && <span style={{ fontSize:11, color:"#c8a96e", background:"#c8a96e22", borderRadius:4, padding:"2px 8px" }}>⭐ Main Story</span>}
             {story.playerId && <span style={{ fontSize:11, color:"#7c5cbf", background:"#7c5cbf22", borderRadius:4, padding:"2px 8px" }}>🎲 {chars.find(c=>c.id===story.playerId)?.name||"Player Story"}</span>}
+          </div>
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
+            {linkedChars.length > 0 && <span onClick={()=>setSubTab("details")} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8b89a", background:"#c8b89a18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8b89a33", cursor:"pointer" }}>👥 {linkedChars.length} char{linkedChars.length!==1?"s":""}</span>}
+            {events.length > 0 && <span onClick={()=>setSubTab("timeline")} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#7c9abf", background:"#7c9abf18", borderRadius:8, padding:"1px 7px", border:"1px solid #7c9abf33", cursor:"pointer" }}>⏳ {events.length} event{events.length!==1?"s":""}</span>}
+            {(story.hooks||[]).filter(h=>h.status==="Active").length > 0 && <span onClick={()=>setSubTab("hooks")} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8a96e", background:"#c8a96e18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8a96e44", cursor:"pointer" }}>🔮 {(story.hooks||[]).filter(h=>h.status==="Active").length} active hook{(story.hooks||[]).filter(h=>h.status==="Active").length!==1?"s":""}</span>}
           </div>
         </div>
 
@@ -491,14 +504,10 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
 
           {/* Characters — user-defined groups */}
           <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("characters")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("characters")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>👥 Characters</span>
-              {linkedChars.length > 0 && <span style={{ fontSize:11, color:"#5a4a7a", marginLeft:4 }}>({linkedChars.length})</span>}
-              {linkedChars.length === 0 && !isSectionOpen("characters") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("characters", "👥 Characters", { count: linkedChars.length, showEmpty: linkedChars.length === 0 })}
             {isSectionOpen("characters") && <div style={{ padding:"0 24px 14px" }}>
+
+              {linkedChars.length === 0 && <div style={{ textAlign:"center", padding:"20px 0 12px", color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>No characters linked yet. Add a group and add characters to it.</div>}
 
               {/* Group rows */}
               <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
@@ -534,9 +543,15 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                               title="Click to rename">{group.name}</span>
                         }
                         {groupChars.length > 0 && <span style={{ fontSize:10, color:"#5a4a7a" }}>({groupChars.length})</span>}
-                        <button onClick={()=>deleteCharGroup(group.id)}
-                          style={{ background:"none", border:"none", color:"#3a2a5a", cursor:"pointer", fontSize:12, padding:0, lineHeight:1 }}
-                          onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#3a2a5a"}>✕</button>
+                        {confirmDeleteGroupId === group.id
+                          ? <>
+                              <button onClick={()=>{ deleteCharGroup(group.id); setConfirmDeleteGroupId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:11, padding:"0 2px", lineHeight:1, fontWeight:700 }}>✓</button>
+                              <button onClick={()=>setConfirmDeleteGroupId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:11, padding:"0 2px", lineHeight:1 }}>✕</button>
+                            </>
+                          : <button onClick={()=>setConfirmDeleteGroupId(group.id)}
+                              style={{ background:"none", border:"none", color:"#3a2a5a", cursor:"pointer", fontSize:12, padding:0, lineHeight:1 }}
+                              onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#3a2a5a"}>✕</button>
+                        }
                       </div>
                       {/* Cards row */}
                       <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
@@ -554,9 +569,15 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                               </div>
                               {c.shortDescription && <div style={{ fontSize:10, color:"#5a4a7a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.shortDescription}</div>}
                             </div>
-                            <button onClick={()=>removeCharFromStory(c.id)}
-                              style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:0, lineHeight:1, flexShrink:0 }}
-                              onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                            {confirmRemoveCharId === c.id
+                              ? <>
+                                  <button onClick={()=>{ removeCharFromStory(c.id); setConfirmRemoveCharId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, flexShrink:0, fontWeight:700 }}>✓</button>
+                                  <button onClick={()=>setConfirmRemoveCharId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, flexShrink:0 }}>✕</button>
+                                </>
+                              : <button onClick={()=>setConfirmRemoveCharId(c.id)}
+                                  style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:0, lineHeight:1, flexShrink:0 }}
+                                  onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                            }
                           </div>
                         ))}
                         {/* [+] add box */}
@@ -616,9 +637,15 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                             </div>
                             {c.shortDescription && <div style={{ fontSize:10, color:"#5a4a7a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.shortDescription}</div>}
                           </div>
-                          <button onClick={()=>removeCharFromStory(c.id)}
-                            style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:0, lineHeight:1, flexShrink:0 }}
-                            onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                          {confirmRemoveCharId === c.id
+                            ? <>
+                                <button onClick={()=>{ removeCharFromStory(c.id); setConfirmRemoveCharId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, flexShrink:0, fontWeight:700 }}>✓</button>
+                                <button onClick={()=>setConfirmRemoveCharId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, flexShrink:0 }}>✕</button>
+                              </>
+                            : <button onClick={()=>setConfirmRemoveCharId(c.id)}
+                                style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:0, lineHeight:1, flexShrink:0 }}
+                                onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                          }
                         </div>
                       ))}
                     </div>
@@ -642,12 +669,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
 
           {/* Description */}
           <div style={{ flex:"1 1 55%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("description")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("description")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>📖 Description</span>
-              {!story.description && !isSectionOpen("description") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("description", "📖 Description", { showEmpty: !story.description })}
             {isSectionOpen("description") && <div style={{ padding:"0 24px 14px" }}>
               {editingField==="description"
                 ? <textarea value={fieldVal} autoFocus
@@ -668,12 +690,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
 
           {/* Rewards / Stakes */}
           <div style={{ flex:"1 1 35%", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("rewards")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("rewards")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>⚖️ Rewards / Stakes</span>
-              {!story.rewards && !isSectionOpen("rewards") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("rewards", "⚖️ Rewards / Stakes", { showEmpty: !story.rewards })}
             {isSectionOpen("rewards") && <div style={{ padding:"0 24px 14px" }}>
               {editingField==="rewards"
                 ? <textarea value={fieldVal} autoFocus
@@ -694,21 +711,25 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
 
           {/* Factions */}
           <div style={{ flex:"1 1 50%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("factions")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("factions")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>⚑ Factions Involved</span>
-              {(story.factionIds||[]).length === 0 && !isSectionOpen("factions") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("factions", "⚑ Factions Involved", { count: (story.factionIds||[]).length, showEmpty: (story.factionIds||[]).length === 0 })}
             {isSectionOpen("factions") && <div style={{ padding:"0 24px 14px" }}>
               {(story.factionIds||[]).length > 0 && (
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
                   {(story.factionIds||[]).map(fid=>{ const f=(factions||[]).find(x=>x.id===fid); return f
-                    ? <div key={fid} style={{ display:"flex", alignItems:"center", gap:4, background:"#5a3da022", border:"1px solid #5a3da066", borderRadius:6, padding:"2px 6px 2px 8px" }}>
-                        <span onClick={()=>onOpenFaction?.(f)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
-                          onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>{f.name}</span>
-                        <button onClick={()=>toggleFac(fid)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
-                          onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                    ? <div key={fid} style={{ display:"flex", alignItems:"center", gap:4, background: confirmRemoveFacId===fid ? "#1a0d0d" : "#5a3da022", border:`1px solid ${confirmRemoveFacId===fid?"#6b1a1a":"#5a3da066"}`, borderRadius:6, padding:"2px 6px 2px 8px", transition:"background .15s, border-color .15s" }}>
+                        {confirmRemoveFacId === fid
+                          ? <>
+                              <span style={{ fontSize:11, color:"#c8b89a" }}>Remove?</span>
+                              <button onClick={()=>{ toggleFac(fid); setConfirmRemoveFacId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, fontWeight:700 }}>✓</button>
+                              <button onClick={()=>setConfirmRemoveFacId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1 }}>✕</button>
+                            </>
+                          : <>
+                              <span onClick={()=>onOpenFaction?.(f)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
+                                onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>{f.name}</span>
+                              <button onClick={()=>setConfirmRemoveFacId(fid)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
+                                onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                            </>
+                        }
                       </div>
                     : null; })}
                 </div>
@@ -739,21 +760,25 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
 
           {/* Locations */}
           <div style={{ flex:"1 1 50%", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("locations")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("locations")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>📍 Locations</span>
-              {(story.locationIds||[]).length === 0 && !isSectionOpen("locations") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("locations", "📍 Locations", { count: (story.locationIds||[]).length, showEmpty: (story.locationIds||[]).length === 0 })}
             {isSectionOpen("locations") && <div style={{ padding:"0 24px 14px" }}>
               {(story.locationIds||[]).length > 0 && (
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
                   {(story.locationIds||[]).map(lid=>{ const l=(locations||[]).find(x=>x.id===lid); return l
-                    ? <div key={lid} style={{ display:"flex", alignItems:"center", gap:4, background:"#1a4a6b22", border:"1px solid #1a4a6b66", borderRadius:6, padding:"2px 6px 2px 8px" }}>
-                        <span onClick={()=>onOpenLocation?.(l)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
-                          onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>{l.region?`${l.name} (${l.region})`:l.name}</span>
-                        <button onClick={()=>toggleLoc(lid)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
-                          onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                    ? <div key={lid} style={{ display:"flex", alignItems:"center", gap:4, background: confirmRemoveLocId===lid ? "#1a0d0d" : "#1a4a6b22", border:`1px solid ${confirmRemoveLocId===lid?"#6b1a1a":"#1a4a6b66"}`, borderRadius:6, padding:"2px 6px 2px 8px", transition:"background .15s, border-color .15s" }}>
+                        {confirmRemoveLocId === lid
+                          ? <>
+                              <span style={{ fontSize:11, color:"#c8b89a" }}>Remove?</span>
+                              <button onClick={()=>{ toggleLoc(lid); setConfirmRemoveLocId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, fontWeight:700 }}>✓</button>
+                              <button onClick={()=>setConfirmRemoveLocId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1 }}>✕</button>
+                            </>
+                          : <>
+                              <span onClick={()=>onOpenLocation?.(l)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
+                                onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>{l.region?`${l.name} (${l.region})`:l.name}</span>
+                              <button onClick={()=>setConfirmRemoveLocId(lid)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
+                                onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                            </>
+                        }
                       </div>
                     : null; })}
                 </div>
@@ -785,7 +810,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
         </div>
       )}
 
-      {subTab==="items" && <LootTab story={story} onUpdateStory={onUpdateStory} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} chars={chars} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact}/>}
+      {subTab==="items" && <LootTab story={story} onUpdateStory={onUpdateStory} artifacts={artifacts||[]} chars={chars} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact} rarities={rarities}/>}
       {subTab==="hooks" && <HooksTab story={story} onUpdateStory={onUpdateStory} hookStatuses={hookStatuses} onPinHook={onPinHook} pinnedHookIds={pinnedHookIds}/>}
       {subTab==="timeline" && (
         <div style={{ padding:"16px 24px" }}>

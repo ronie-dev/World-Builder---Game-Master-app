@@ -80,7 +80,7 @@ export default function GlobalTimeline({ stories, chars, loreEvents, eras, onOpe
   );
 
   // ── Quick-jump bar ───────────────────────────────────────────────────────────
-  const JumpBar = () => {
+  const renderJumpBar = () => {
     const items = [];
     allGroups.forEach(({ group, labelOverride, dimmed }, i) => {
       // Insert era markers before this group if era boundary falls here
@@ -197,7 +197,7 @@ export default function GlobalTimeline({ stories, chars, loreEvents, eras, onOpe
   };
 
   // ── Group renderer ───────────────────────────────────────────────────────────
-  const renderGroup = ({ group, labelOverride, dimmed }, i) => {
+  const renderGroup = ({ group, labelOverride, dimmed }) => {
     const isOpen = !collapsed[group.key];
     const label = labelOverride || formatEventDate({year:group.year, month:group.month, day:group.day}) || "No date";
     const isActive = activeKey === group.key;
@@ -259,7 +259,7 @@ export default function GlobalTimeline({ stories, chars, loreEvents, eras, onOpe
 
   return (
     <div style={{ paddingLeft:4 }}>
-      <JumpBar/>
+      {renderJumpBar()}
       {allGroups.map(({ group, labelOverride, dimmed }, idx) => {
         const items = [];
         if (!labelOverride && group.year) {

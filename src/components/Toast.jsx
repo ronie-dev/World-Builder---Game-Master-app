@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, createContext, useContext } from "react";
+import { useState, useCallback, useRef } from "react";
+import { ToastContext } from "./ToastContext.js";
 
 const COLORS = {
   success: { bg:"#1a2e1a", border:"#2d6a4f", icon:"✓" },
@@ -7,14 +8,16 @@ const COLORS = {
   undo:    { bg:"#1a1a2e", border:"#3a4a8a", icon:"↩" },
 };
 
-const ToastContext = createContext(null);
+function createToastId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const timers = useRef({});
 
   const showToast = useCallback((msg, type = "success") => {
-    const id = Date.now() + Math.random();
+    const id = createToastId();
     setToasts(prev => [...prev.slice(-2), { id, msg, type }]);
     timers.current[id] = setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -34,33 +37,6 @@ export function ToastProvider({ children }) {
       <ToastContainer toasts={toasts} dismiss={dismiss}/>
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (ctx) return ctx;
-  // fallback for App.jsx which creates its own instance before provider was added
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [toasts, setToasts] = useState([]);
-  const timers = useRef({});
-  const showToast = useCallback((msg, type = "success") => {
-    const id = Date.now() + Math.random();
-    setToasts(prev => [...prev.slice(-2), { id, msg, type }]);
-    timers.current[id] = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-      delete timers.current[id];
-    }, 2500);
-  }, []);
-  const dismiss = useCallback(id => {
-    clearTimeout(timers.current[id]);
-    delete timers.current[id];
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-  return { toasts, showToast, dismiss };
-}
-
-export function useToastContext() {
-  return useContext(ToastContext);
 }
 
 export function ToastContainer({ toasts, dismiss }) {

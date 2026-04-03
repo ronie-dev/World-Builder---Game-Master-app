@@ -56,7 +56,7 @@ function ComboFilter({ label, value, onChange, opts }) {
   );
 }
 
-export default function SearchBar({ query, setQuery, filters, setFilters, chars, races, factions, locations }) {
+export default function SearchBar({ query, setQuery, filters, setFilters, races, factions, locations }) {
   const activeCount = Object.values(filters).filter(Boolean).length;
   return (
     <div style={{ marginBottom:20, background:"#110e1c", border:"1px solid #2a1f3d", borderRadius:10, padding:14 }}>

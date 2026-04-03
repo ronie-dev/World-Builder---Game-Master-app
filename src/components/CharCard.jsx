@@ -15,6 +15,7 @@ const CharCard = React.memo(function CharCard({ char, races, factions, locations
   const linkedFactions = factions.filter(f => (char.factions||[]).some(e=>e.factionId===f.id));
   const locationObj = (locations||[]).find(l=>l.id===char.locationId);
   const locationName = locationObj ? (locationObj.region ? `${locationObj.name} (${locationObj.region})` : locationObj.name) : "";
+  const activeHooks = (char.hooks||[]).filter(h=>h.status==="Active");
 
   return (
     <div onClick={()=>onSelect(char)}
@@ -28,6 +29,12 @@ const CharCard = React.memo(function CharCard({ char, races, factions, locations
           <span style={{ fontSize:10, color:accent, opacity:.8 }}>{isMain ? "⭐" : "👤"}</span>
           {char.status && <Badge label={char.status} color={(charStatuses||[]).find(s=>s.name===char.status)?.color||CHAR_STATUS_COLORS[char.status]||"#333"}/>}
           {linkedFactions.map(f=><Badge key={f.id} label={f.name} color={getFactionColor(factions,f.id)}/>)}
+          {activeHooks.length > 0 && (
+            <span title={`${activeHooks.length} active hook${activeHooks.length!==1?"s":""}`}
+              style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8a96e", background:"#c8a96e18", borderRadius:8, padding:"1px 6px", border:"1px solid #c8a96e44" }}>
+              🔮 {activeHooks.length}
+            </span>
+          )}
         </div>
         <div style={{ display:"flex", gap:10, fontSize:11, color:"#9a7fa0" }}>
           {raceLabel && <span style={{ display:"flex", alignItems:"center", gap:3 }}>{raceIcon ? <img src={raceIcon} alt="" style={{ width:12, height:12, objectFit:"cover", borderRadius:2 }}/> : "🧬"} {raceLabel}</span>}

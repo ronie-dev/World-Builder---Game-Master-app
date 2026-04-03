@@ -1,4 +1,4 @@
-import { useToastContext } from "./Toast.jsx";
+import { useToastContext } from "./ToastContext.js";
 
 function downloadImage(dataUrl) {
   const a = document.createElement("a");

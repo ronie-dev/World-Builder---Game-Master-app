@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from "react";
 import { uid } from "../utils.jsx";
-import { DEFAULT_RARITIES, defaultArtifact, inputStyle, selStyle, btnPrimary, btnSecondary, iconBtn } from "../constants.js";
+import { DEFAULT_RARITIES, defaultArtifact, inputStyle, btnPrimary, btnSecondary } from "../constants.js";
 import Avatar from "./Avatar.jsx";
 import ImageUploadZone from "./ImageUploadZone.jsx";
 
@@ -269,13 +269,9 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
   const [search, setSearch] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
 
-  const selected = artifacts.find(a => a.id === selectedId) || null;
-
-  useEffect(() => {
-    if (!navArtifactId) return;
-    const a = artifacts.find(x => x.id === navArtifactId);
-    if (a) { setSelectedId(a.id); setIsEditing(false); }
-  }, [navArtifactId]); // eslint-disable-line
+  const effectiveSelectedId = navArtifactId && artifacts.some(a => a.id === navArtifactId) ? navArtifactId : selectedId;
+  const selected = artifacts.find(a => a.id === effectiveSelectedId) || null;
+  const effectiveIsEditing = navArtifactId && navArtifactId !== selectedId ? false : isEditing;
 
   const handleNew = () => {
     const newId = uid();
@@ -300,7 +296,7 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
     const a = artifacts.find(x => x.id === id);
     onAskConfirm(`Delete "${a?.name || "this item"}"?`, () => {
       onUpdateArtifacts(artifacts.filter(x => x.id !== id));
-      if (selectedId === id) { setSelectedId(null); setIsEditing(false); }
+      if (effectiveSelectedId === id) { setSelectedId(null); setIsEditing(false); }
       onCloseConfirm();
     });
   };
@@ -398,7 +394,7 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
               onDelete={() => deleteArtifact(selected.id)}
               onClose={() => { setSelectedId(null); setIsEditing(false); }}
               onCancelNew={handleCancelNew}
-              isEditing={isEditing}
+              isEditing={effectiveIsEditing}
               onSetEditing={setIsEditing}
               onOpenChar={onOpenChar}
               onOpenStory={onOpenStory}

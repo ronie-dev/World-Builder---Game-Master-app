@@ -45,7 +45,7 @@ const locIcon = loc => TYPE_ICONS[loc.type] || "📍";
 function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConfirm, onCloseConfirm, navTarget }) {
   const maps = mapData?.maps || [];
 
-  const [activeMapId, setActiveMapId] = useState(() => maps[0]?.id || null);
+  const [activeMapIdState, setActiveMapId] = useState(() => maps[0]?.id || null);
   const [placing, setPlacing]         = useState(false);
   const [pendingPin, setPendingPin]   = useState(null);
   const [pinSearch, setPinSearch]     = useState("");
@@ -62,6 +62,7 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
   const [showLabels, setShowLabels]   = useState(() => localStorage.getItem("map_showLabels") !== "false");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [sidebarType, setSidebarType]     = useState("");
+  const [confirmRemovePinId, setConfirmRemovePinId] = useState(null);
 
   const viewportRef = useRef();
   const imgRef      = useRef();
@@ -74,7 +75,6 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
 
   useEffect(() => {
     if (!navTarget) return;
-    setActiveMapId(navTarget.mapId);
     const pin = navTarget.pin;
     let t;
     const tryCenter = () => {
@@ -91,17 +91,11 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
     };
     t = setTimeout(tryCenter, 80);
     return () => clearTimeout(t);
-  }, [navTarget]); // eslint-disable-line
+  }, [navTarget]);
 
-  // Keep activeMapId valid when maps list changes
-  useEffect(() => {
-    if (maps.length > 0 && !maps.find(m => m.id === activeMapId)) {
-      setActiveMapId(maps[0].id);
-    } else if (maps.length === 0) {
-      setActiveMapId(null);
-    }
-  }, [maps]); // eslint-disable-line
-
+  const activeMapId = navTarget?.mapId && maps.find(m => m.id === navTarget.mapId)
+    ? navTarget.mapId
+    : maps.find(m => m.id === activeMapIdState) ? activeMapIdState : (maps[0]?.id || null);
   const activeMap = maps.find(m => m.id === activeMapId) || null;
   const image     = activeMap?.image || null;
   const pins      = activeMap?.pins  || [];
@@ -162,7 +156,7 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, [image, activeMapId]); // eslint-disable-line
+  }, [image, activeMapId]);
 
   const zoomToCenter = factor => {
     const el = viewportRef.current;
@@ -499,8 +493,14 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
                           onClick={()=>{ if(!placing && !didDrag.current) onOpenLocation(loc); }}>
                           {loc.name}
                         </span>
-                        {isHov && <button onClick={()=>removePin(pin.id)}
-                          style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:14, lineHeight:1, padding:"0 0 0 2px" }}>×</button>}
+                        {isHov && (confirmRemovePinId === pin.id
+                          ? <>
+                              <button onClick={()=>{ removePin(pin.id); setConfirmRemovePinId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, lineHeight:1, padding:"0 2px", fontWeight:700 }}>✓</button>
+                              <button onClick={()=>setConfirmRemovePinId(null)} style={{ background:"none", border:"none", color:"#9a7fa0", cursor:"pointer", fontSize:12, lineHeight:1, padding:"0 2px" }}>✕</button>
+                            </>
+                          : <button onClick={()=>setConfirmRemovePinId(pin.id)}
+                              style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:14, lineHeight:1, padding:"0 0 0 2px" }}>×</button>
+                        )}
                       </div>
                     )}
                   </div>

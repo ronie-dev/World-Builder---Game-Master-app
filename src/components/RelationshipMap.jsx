@@ -44,9 +44,16 @@ export default function RelationshipMap({ chars, factions, relations, onUpdateRe
 
   const addToMap = (entityId, entityType) => {
     if (nodes.find(n => n.entityId === entityId)) return;
+    const index = nodes.length;
     onUpdateRelations({
       ...relations,
-      nodes: [...nodes, { id: uid(), entityId, entityType, x: 150 + Math.random() * 600, y: 80 + Math.random() * 380 }],
+      nodes: [...nodes, {
+        id: uid(),
+        entityId,
+        entityType,
+        x: 150 + (index % 6) * 110,
+        y: 80 + Math.floor(index / 6) * 90,
+      }],
     });
   };
 

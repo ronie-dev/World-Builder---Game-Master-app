@@ -15,6 +15,7 @@ function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveCh
   const [newTierName, setNewTierName] = useState("");
   const [addingTier, setAddingTier] = useState(false);
   const [confirmDeleteTierId, setConfirmDeleteTierId] = useState(null);
+  const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState(null);
   const [addingToTierId, setAddingToTierId] = useState(null);
   const [addSearch, setAddSearch] = useState("");
 
@@ -166,9 +167,15 @@ function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveCh
                     <Avatar src={c.image} name={c.name} size={28}/>
                     <span style={{ fontSize:12, color:"#e8d5b7", fontWeight:600 }}>{c.name}</span>
                     <span style={{ fontSize:10, color:"#7c5cbf", opacity:.7 }}>↗</span>
-                    <button onClick={e=>{ e.stopPropagation(); removeMember(c.id); }}
-                      style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:14, padding:"0 2px", lineHeight:1, marginLeft:2, flexShrink:0 }}
-                      onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                    {confirmRemoveMemberId === c.id
+                      ? <>
+                          <button onClick={e=>{ e.stopPropagation(); removeMember(c.id); setConfirmRemoveMemberId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, marginLeft:2, flexShrink:0, fontWeight:700 }}>✓</button>
+                          <button onClick={e=>{ e.stopPropagation(); setConfirmRemoveMemberId(null); }} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1, flexShrink:0 }}>✕</button>
+                        </>
+                      : <button onClick={e=>{ e.stopPropagation(); setConfirmRemoveMemberId(c.id); }}
+                          style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:14, padding:"0 2px", lineHeight:1, marginLeft:2, flexShrink:0 }}
+                          onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                    }
                   </div>
                 ))}
                 {/* Add character box */}
@@ -227,10 +234,6 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
   const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
 
   useEffect(() => {
-    setEditingField(null); setFieldVal(""); setConfirmDelete(false);
-  }, [faction?.id]); // eslint-disable-line
-
-  useEffect(() => {
     const handler = e => {
       if (e.key !== "Escape") return;
       if (editingField !== null) { setEditingField(null); return; }
@@ -268,8 +271,8 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
       <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
       {/* ── Sticky header ── */}
-      <div style={{ position:"sticky", top:0, zIndex:20, borderRadius:"12px 12px 0 0" }}>
-      <div style={{ background:`linear-gradient(90deg,#13101f,${color}aa)`, padding:"18px 24px", display:"flex", alignItems:"flex-start", gap:16, borderBottom:"1px solid #2a1f3d", borderRadius:"12px 12px 0 0" }}>
+      <div style={{ position:"sticky", top:0, zIndex:20, borderRadius:"12px 12px 0 0", background:"#13101f", overflow:"hidden" }}>
+      <div style={{ background:`linear-gradient(90deg,#13101f,${color}cc)`, padding:"18px 24px", display:"flex", alignItems:"flex-start", gap:16, borderBottom:"1px solid #2a1f3d" }}>
 
         {/* Portrait */}
         <PortraitZone value={faction.image} onChange={src=>onSave({...faction,image:src})} size={72} emptyIcon="🏴" emptyLabel="Add logo"/>
@@ -345,6 +348,13 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
                     : <span style={{ color:"#3a2a5a", fontSize:12, fontStyle:"italic" }}>📍 Set location…</span>}
                 </div>;
           })()}
+          {/* Summary strip */}
+          {(allMembers.length > 0 || (faction.tiers||[]).length > 1) && (
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
+              {allMembers.length > 0 && <span style={{ display:"inline-flex", alignItems:"center", fontSize:10, color:"#c8b89a", background:"#c8b89a18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8b89a33" }}>👥 {allMembers.length} member{allMembers.length!==1?"s":""}</span>}
+              {(faction.tiers||[]).length > 1 && <span style={{ display:"inline-flex", alignItems:"center", fontSize:10, color:"#7c5cbf", background:"#7c5cbf18", borderRadius:8, padding:"1px 7px", border:"1px solid #7c5cbf33" }}>🏗️ {(faction.tiers||[]).length} tiers</span>}
+            </div>
+          )}
         </div>
 
         {/* Right: color swatches + actions */}

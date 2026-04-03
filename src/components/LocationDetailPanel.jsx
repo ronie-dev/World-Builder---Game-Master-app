@@ -1,6 +1,5 @@
 import { useState, useEffect, memo } from "react";
 import { inputStyle, selStyle, btnPrimary, btnSecondary, STATUS_COLORS, defaultLocation } from "../constants.js";
-import { getFactionColor } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
 import Badge from "./Badge.jsx";
 import LinkBadge from "./LinkBadge.jsx";
@@ -8,6 +7,7 @@ import LinkBadge from "./LinkBadge.jsx";
 function LocationDetailPanel({ location, chars, factions, stories, onClose, onSave, onDelete, onOpenChar, onOpenStory, onOpenFaction, onShowOnMap, isEditing, onSetEditing, locationTypes }) {
   const [editForm, setEditForm] = useState({ ...defaultLocation, ...location });
   const [sideOpen, setSideOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => { setEditForm({ ...defaultLocation, ...location }); }, [location?.id]); // eslint-disable-line
 
@@ -51,7 +51,15 @@ function LocationDetailPanel({ location, chars, factions, stories, onClose, onSa
               {location.type && <span style={{ background:"#1a3a6b", color:"#e8d5b7", borderRadius:4, padding:"2px 8px", fontSize:11, fontWeight:700, letterSpacing:1 }}>{location.type}</span>}
             </div>
           )}
-          {!isEditing && location.region && <div style={{ color:"#9a7fa0", fontSize:13 }}>🗺️ {location.region}</div>}
+          {!isEditing && location.region && <div style={{ color:"#9a7fa0", fontSize:13, marginBottom:6 }}>🗺️ {location.region}</div>}
+          {!isEditing && (residents.length > 0 || linkedFactions.length > 0 || linkedStories.length > 0) && (
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              {mainResidents.length > 0 && <span style={{ display:"inline-flex", alignItems:"center", fontSize:10, color:"#c8b89a", background:"#c8b89a18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8b89a33" }}>⭐ {mainResidents.length} resident{mainResidents.length!==1?"s":""}</span>}
+              {sideResidents.length > 0 && <span style={{ display:"inline-flex", alignItems:"center", fontSize:10, color:"#9a7fa0", background:"#9a7fa018", borderRadius:8, padding:"1px 7px", border:"1px solid #9a7fa033" }}>👤 {sideResidents.length} side</span>}
+              {linkedFactions.length > 0 && <span style={{ display:"inline-flex", alignItems:"center", fontSize:10, color:"#7c9abf", background:"#7c9abf18", borderRadius:8, padding:"1px 7px", border:"1px solid #7c9abf33" }}>⚑ {linkedFactions.length} faction{linkedFactions.length!==1?"s":""}</span>}
+              {linkedStories.length > 0 && <span style={{ display:"inline-flex", alignItems:"center", fontSize:10, color:"#7c5cbf", background:"#7c5cbf18", borderRadius:8, padding:"1px 7px", border:"1px solid #7c5cbf33" }}>📜 {linkedStories.length} stor{linkedStories.length!==1?"ies":"y"}</span>}
+            </div>
+          )}
         </div>
         <div style={{ display:"flex", gap:8, flexShrink:0 }}>
           {isEditing ? (
@@ -63,7 +71,14 @@ function LocationDetailPanel({ location, chars, factions, stories, onClose, onSa
             <>
               {onShowOnMap && <button onClick={onShowOnMap} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px" }}>🗺️ Map</button>}
               <button onClick={() => onSetEditing(true)} style={{ ...btnPrimary, fontSize:12, padding:"6px 14px" }}>✏️ Edit</button>
-              {onDelete && <button onClick={() => onDelete(location.id)} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px", color:"#c06060", borderColor:"#6b1a1a" }}>🗑️ Delete</button>}
+              {onDelete && (confirmDelete
+                ? <>
+                    <span style={{ fontSize:12, color:"#c8b89a", alignSelf:"center" }}>Delete?</span>
+                    <button onClick={()=>{ setConfirmDelete(false); onDelete(location.id); }} style={{...btnSecondary,fontSize:12,padding:"4px 10px",color:"#c06060",borderColor:"#6b1a1a"}}>Yes</button>
+                    <button onClick={()=>setConfirmDelete(false)} style={{...btnSecondary,fontSize:12,padding:"4px 10px"}}>No</button>
+                  </>
+                : <button onClick={()=>setConfirmDelete(true)} style={{ ...btnSecondary, fontSize:12, padding:"6px 14px", color:"#c06060", borderColor:"#6b1a1a" }}>🗑️ Delete</button>
+              )}
             </>
           )}
           <button onClick={onClose} style={{ ...btnSecondary, fontSize:18, padding:"2px 10px", lineHeight:1 }}>×</button>

@@ -1,5 +1,6 @@
 import { memo } from "react";
-import { btnPrimary, btnSecondary, defaultChar } from "../../constants.js";
+import { btnPrimary, btnSecondary } from "../../constants.js";
+import { EmptyState } from "../ui.jsx";
 import CharSection from "../CharSection.jsx";
 import CharCard from "../CharCard.jsx";
 import SearchBar from "../SearchBar.jsx";
@@ -37,15 +38,15 @@ function CharactersTabContent({
           <SearchBar query={query} setQuery={v=>updPg({query:v})} filters={filters} setFilters={v=>updPg({filters:v})} chars={chars} races={races} factions={factions} locations={locations}/>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
             <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-              <span style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:17, fontWeight:700 }}>Characters <span style={{ fontSize:12, color:"#7c5cbf", fontFamily:"sans-serif" }}>({main.length + side.length})</span></span>
+              <span style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:17, fontWeight:700 }}>Characters <span style={{ fontSize:12, color:"#7c5cbf" }}>({main.length + side.length})</span></span>
             </div>
             <div style={{ display:"flex", gap:8 }}>
-              <button onClick={()=>onNewChar("main")} style={{ ...btnPrimary, fontSize:12, padding:"5px 12px" }}>+ Main</button>
-              <button onClick={()=>onNewChar("side")} style={{ ...btnSecondary, fontSize:12, padding:"5px 12px" }}>+ Side</button>
+              <button onClick={()=>onNewChar("main")} style={{ ...btnPrimary, fontSize:13, padding:"6px 14px" }}>+ Main</button>
+              <button onClick={()=>onNewChar("side")} style={{ ...btnSecondary, fontSize:13, padding:"6px 14px" }}>+ Side</button>
             </div>
           </div>
           {main.length + side.length === 0
-            ? <div style={{ textAlign:"center", padding:"24px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:8, fontSize:13 }}>No characters found.</div>
+            ? <div style={{ textAlign:"center", padding:"24px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:8, fontSize:13 }}>No characters match your search or filters.</div>
             : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 <div onClick={()=>updPg({ mainCollapsed: !mainCollapsed })} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", cursor:"pointer", userSelect:"none" }}>
                   <span style={{ fontSize:11, color:"#c8a96e" }}>{mainCollapsed?"▶":"▼"}</span>
@@ -76,6 +77,7 @@ function CharactersTabContent({
         <div style={{ flex:1, minWidth:0, overflowY:"auto" }}>
           {selectedChar
             ? <CharDetailPanel
+                key={selectedChar.id}
                 char={selectedChar} chars={chars} races={races} factions={factions}
                 stories={stories} locations={locations} loreEvents={loreEvents}
                 charStatuses={charStatuses} storyStatuses={storyStatuses}
@@ -87,10 +89,7 @@ function CharactersTabContent({
                 onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}
                 onPinCharHook={onPinCharHook} pinnedCharHookIds={pinnedCharHookIds}
                 subTab={charSubTab} onSubTabChange={v=>updPg({ charSubTab: v })} rarities={rarities}/>
-            : <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
-                <div style={{ fontSize:40, marginBottom:12 }}>👤</div>
-                <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select a character to view details</div>
-              </div>
+            : <EmptyState icon="👤" title="Select a character to view details"/>
           }
         </div>
       </div>

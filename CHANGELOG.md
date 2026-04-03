@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.6.0 — Codebase Cleanup & Structural Refactor
+
+### Architecture
+- All major tab components extracted from `App.jsx` into dedicated files under `src/components/tabs/` — `GalleryTabContent`, `NotesTabContent`, `CharactersTabContent`, `StoriesTabContent`, `FactionsTabContent`, `LocationsTabContent` are now standalone modules
+- `App.jsx` reduced by ~700 lines across the two cleanup passes
+
+### UX Polish (from PLAN.md refactor)
+- **2-step delete confirmations** added throughout — Characters, Stories, Factions, Locations, Map pins, and all linked entity removals now require an inline ✓/✕ confirm before any data is deleted
+- **Summary strips** in detail panel headers — Locations, Factions, and Stories show at-a-glance counts (residents, members, factions, stories, hooks) as clickable pills
+- **Empty states** added to Characters, Stories, Factions, and Locations list and detail panel sections with helpful copy
+- **Button transitions** (`opacity`, `box-shadow`, `border-color`) added to `btnPrimary`, `btnSecondary`, and `iconBtn` tokens for consistent hover feedback
+- **CardRow hover** now also shifts background color for better click affordance
+
+### Command Palette
+- Added **type filter tabs** (All, Characters, Stories, Factions, Locations, Items, Lore) — filter results by entity type without typing a prefix
+- Result limit raised to 60; footer always visible with keyboard hint and result count
+- Faction icon updated to ⚑ (consistent with the rest of the app)
+
+### Gallery Picker
+- Fixed a hover bug where overlapping mouse event handlers competed — overlay now has `pointerEvents:"none"`
+- **Escape key** closes the picker
+- Footer shows `Esc to close` hint
+
+### Faction Header Fix
+- Fixed transparent faction detail panel header — sticky wrapper now has a solid background and `overflow:hidden` to prevent scrolled content bleeding through the gradient
+
 ## v0.5.1 — Era Timeline, Filter Polish & Bug Fixes
 
 ### Timeline — Era Separators

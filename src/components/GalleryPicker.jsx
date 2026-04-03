@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { btnPrimary, btnSecondary, inputStyle } from "../constants.js";
+import { useState, useMemo, useEffect } from "react";
+import { btnSecondary, inputStyle } from "../constants.js";
 
 const TYPE_COLORS = {
   Character: "#7c5cbf",
@@ -13,6 +13,13 @@ const TYPE_COLORS = {
 export default function GalleryPicker({ images, onSelect, onClose }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+
+  useEffect(() => {
+    const handler = e => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   const types = useMemo(() => ["All", ...new Set(images.map(i => i.type))], [images]);
 
@@ -65,22 +72,21 @@ export default function GalleryPicker({ images, onSelect, onClose }) {
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(110px, 1fr))", gap:10 }}>
               {visible.map((img, i) => {
                 const color = TYPE_COLORS[img.type] || "#7c5cbf";
+                const isHov = hoveredIdx === i;
                 return (
                   <div key={i} onClick={() => { onSelect(img.src); onClose(); }}
-                    style={{ borderRadius:8, overflow:"hidden", border:"2px solid #2a1f3d", cursor:"pointer", position:"relative", aspectRatio:"1", background:"#0d0b14", transition:"border-color .15s, transform .12s" }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = "scale(1.04)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a1f3d"; e.currentTarget.style.transform = "scale(1)"; }}>
+                    style={{ borderRadius:8, overflow:"hidden", border:`2px solid ${isHov ? color : "#2a1f3d"}`, cursor:"pointer", position:"relative", aspectRatio:"1", background:"#0d0b14", transition:"border-color .15s, transform .12s", transform: isHov ? "scale(1.04)" : "scale(1)" }}
+                    onMouseEnter={() => setHoveredIdx(i)}
+                    onMouseLeave={() => setHoveredIdx(null)}>
                     <img src={img.src} alt={img.label} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
-                    <div style={{ position:"absolute", inset:0, background:"linear-gradient(transparent 50%, rgba(0,0,0,0.82) 100%)", opacity:0, transition:"opacity .15s" }}
-                      onMouseEnter={e => { e.currentTarget.style.opacity=1; }}
-                      onMouseLeave={e => { e.currentTarget.style.opacity=0; }}>
+                    <div style={{ position:"absolute", inset:0, background:"linear-gradient(transparent 50%, rgba(0,0,0,0.82) 100%)", opacity: isHov ? 1 : 0, transition:"opacity .15s", pointerEvents:"none" }}>
                       <div style={{ position:"absolute", bottom:0, left:0, right:0, padding:"4px 6px" }}>
                         <div style={{ fontSize:10, color:"#fff", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{img.label}</div>
                         <div style={{ fontSize:9, color:color }}>{img.type}</div>
                       </div>
                     </div>
                     {/* Always-visible type dot */}
-                    <div style={{ position:"absolute", top:5, right:5, width:8, height:8, borderRadius:"50%", background:color, boxShadow:`0 0 4px ${color}` }}/>
+                    <div style={{ position:"absolute", top:5, right:5, width:8, height:8, borderRadius:"50%", background:color, boxShadow:`0 0 4px ${color}`, pointerEvents:"none" }}/>
                   </div>
                 );
               })}
@@ -89,7 +95,7 @@ export default function GalleryPicker({ images, onSelect, onClose }) {
         </div>
 
         <div style={{ padding:"12px 18px", borderTop:"1px solid #2a1f3d", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:12, color:"#5a4a7a" }}>{visible.length} image{visible.length!==1?"s":""}{filter!=="All"?` · ${filter}`:""}</span>
+          <span style={{ fontSize:12, color:"#5a4a7a" }}>{visible.length} image{visible.length!==1?"s":""}{filter!=="All"?` · ${filter}`:""} · <kbd style={{ fontFamily:"monospace", background:"#1e1630", border:"1px solid #3a2a5a", borderRadius:3, padding:"1px 4px", fontSize:11 }}>Esc</kbd> to close</span>
           <button onClick={onClose} style={{...btnSecondary, fontSize:12, padding:"6px 16px"}}>Cancel</button>
         </div>
       </div>

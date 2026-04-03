@@ -320,12 +320,14 @@ function CharTimeline({ evGroupMap, evGroupOrder, evUndated, stories, onOpenStor
 }
 
 // ── Items Tab ─────────────────────────────────────────────────────────────────
-function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArtifact }) {
+function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArtifact, rarities }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [addingNew, setAddingNew] = useState(false);
   const [newForm, setNewForm] = useState({ name:"", description:"", value:"", image:null });
   const [lightbox, setLightbox] = useState(null);
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState(null);
+  const rarityColors = Object.fromEntries((rarities || DEFAULT_RARITIES).map(r => [r.name, r.color]));
 
   const items = char.items||[];
 
@@ -438,9 +440,18 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
                   {it.description&&<div style={{ fontSize:13, color:"#b09080", lineHeight:1.5, whiteSpace:"pre-wrap" }}>{it.description}</div>}
                 </div>
                 {it.value&&<div style={{ display:"flex", alignItems:"center", gap:5, fontSize:13, color:"#c8a96e", fontWeight:700, flexShrink:0, alignSelf:"center", background:"#c8a96e18", border:"1px solid #c8a96e44", borderRadius:6, padding:"3px 10px" }}><span style={{ fontSize:15 }}>🪙</span>{it.value}</div>}
-                <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-                  <button onClick={()=>startEdit(it)} style={{...btnSecondary,fontSize:12,padding:"4px 10px"}}>✏️</button>
-                  <button onClick={()=>removeItem(it.id)} style={{...btnSecondary,fontSize:12,padding:"4px 10px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️</button>
+                <div style={{ display:"flex", gap:6, flexShrink:0, alignItems:"center" }}>
+                  {confirmDeleteItemId===it.id
+                    ? <>
+                        <span style={{ fontSize:11, color:"#c8b89a" }}>Remove?</span>
+                        <button onClick={()=>{ removeItem(it.id); setConfirmDeleteItemId(null); }} style={{...btnSecondary,fontSize:11,padding:"3px 8px",color:"#c06060",borderColor:"#6b1a1a"}}>Yes</button>
+                        <button onClick={()=>setConfirmDeleteItemId(null)} style={{...btnSecondary,fontSize:11,padding:"3px 8px"}}>No</button>
+                      </>
+                    : <>
+                        <button onClick={()=>startEdit(it)} style={{...btnSecondary,fontSize:12,padding:"4px 10px"}}>✏️</button>
+                        <button onClick={()=>setConfirmDeleteItemId(it.id)} style={{...btnSecondary,fontSize:12,padding:"4px 10px",color:"#c06060",borderColor:"#6b1a1a"}}>🗑️</button>
+                      </>
+                  }
                 </div>
               </div>
             )}
@@ -452,7 +463,6 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
 }
 
 function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, rarities }) {
-  const rarityColors = Object.fromEntries((rarities || DEFAULT_RARITIES).map(r => [r.name, r.color]));
   const [subTabInternal, setSubTabInternal] = useState("details");
   const subTab = subTabProp ?? subTabInternal;
   const setSubTab = onSubTabChange ?? setSubTabInternal;
@@ -470,18 +480,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
   const [renameVal, setRenameVal] = useState("");
   const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
   const [sectionToggles, setSectionToggles] = useState({});
-
-  useEffect(() => {
-    setEditingField(null);
-    setFieldVal("");
-    setPendingType(null);
-    setActiveTextTab("biography");
-    setDescExpanded(false);
-    setConfirmDelete(false);
-    setSectionToggles({});
-  }, [char?.id]); // eslint-disable-line
-
-  if (!char) return null;
+  const [confirmLinkIdx, setConfirmLinkIdx] = useState(null);
 
   // Commit a single field and exit edit mode
   const commit = (field, val) => { onUpdateChar({...char, [field]: val}); setEditingField(null); };
@@ -549,6 +548,24 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
   // Subtle hover affordance for clickable fields
   const fh = { onMouseEnter: e=>e.currentTarget.style.background="#ffffff09", onMouseLeave: e=>e.currentTarget.style.background="transparent" };
   const LABEL = { fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase", marginBottom:6 };
+
+  // Derived counts used in summary strip and section headers
+  const factionCount = (char.factions||[]).filter(e=>e.factionId).length;
+  const relCount = (char.relationships||[]).filter(r=>r.charId).length;
+  const activeHookCount = (char.hooks||[]).filter(h=>h.status==="Active").length;
+
+  // Reusable collapsible section header
+  const SectionHead = (sectionKey, label, { count=0, emptyWhen=false, labelColor=null } = {}) => (
+    <div onClick={()=>toggleSection(sectionKey)}
+      style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
+      onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"}
+      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+      <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen(sectionKey)?"▼":"▶"}</span>
+      <span style={{...LABEL, marginBottom:0, ...(labelColor ? {color:labelColor} : {})}}>{label}</span>
+      {count > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({count})</span>}
+      {emptyWhen && !isSectionOpen(sectionKey) && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
+    </div>
+  );
 
   // Bio/custom tab helpers
   const allTextTabs = [{id:"biography", name:isPlayer?"Biography":"Description", content:char.description||""}, ...(char.textTabs||[])];
@@ -768,6 +785,40 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             </div>
           )}
 
+          {/* Summary strip — quick at-a-glance counts for key linked data */}
+          {(linkedStories.length > 0 || factionCount > 0 || relCount > 0 || activeHookCount > 0) && (
+            <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
+              {linkedStories.length > 0 && (
+                <span onClick={()=>setSectionToggles(t=>({...t,appearsIn:true}))}
+                  style={{ fontSize:11, color:"#9a7fa0", cursor:"pointer", background:"#7c5cbf18", borderRadius:10, padding:"2px 9px", border:"1px solid #7c5cbf33", transition:"background .15s" }}
+                  onMouseEnter={e=>e.currentTarget.style.background="#7c5cbf30"} onMouseLeave={e=>e.currentTarget.style.background="#7c5cbf18"}>
+                  📜 {linkedStories.length} {linkedStories.length===1?"story":"stories"}
+                </span>
+              )}
+              {factionCount > 0 && (
+                <span onClick={()=>setSectionToggles(t=>({...t,factions:true}))}
+                  style={{ fontSize:11, color:"#9a7fa0", cursor:"pointer", background:"#7c5cbf18", borderRadius:10, padding:"2px 9px", border:"1px solid #7c5cbf33", transition:"background .15s" }}
+                  onMouseEnter={e=>e.currentTarget.style.background="#7c5cbf30"} onMouseLeave={e=>e.currentTarget.style.background="#7c5cbf18"}>
+                  ⚑ {factionCount} {factionCount===1?"faction":"factions"}
+                </span>
+              )}
+              {relCount > 0 && (
+                <span onClick={()=>setSectionToggles(t=>({...t,relationships:true}))}
+                  style={{ fontSize:11, color:"#9a7fa0", cursor:"pointer", background:"#7c5cbf18", borderRadius:10, padding:"2px 9px", border:"1px solid #7c5cbf33", transition:"background .15s" }}
+                  onMouseEnter={e=>e.currentTarget.style.background="#7c5cbf30"} onMouseLeave={e=>e.currentTarget.style.background="#7c5cbf18"}>
+                  🔗 {relCount} {relCount===1?"relationship":"relationships"}
+                </span>
+              )}
+              {activeHookCount > 0 && (
+                <span onClick={()=>setSubTab("hooks")}
+                  style={{ fontSize:11, color:"#c8a96e", cursor:"pointer", background:"#c8a96e18", borderRadius:10, padding:"2px 9px", border:"1px solid #c8a96e44", transition:"background .15s" }}
+                  onMouseEnter={e=>e.currentTarget.style.background="#c8a96e28"} onMouseLeave={e=>e.currentTarget.style.background="#c8a96e18"}>
+                  🔮 {activeHookCount} active {activeHookCount===1?"hook":"hooks"}
+                </span>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Status + Actions — top right */}
@@ -883,12 +934,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
           {/* Secret (main only) */}
           {char.type==="main" && (
             <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630", background:"#0d0a18" }}>
-              <div onClick={()=>toggleSection("secret")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-                onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("secret")?"▼":"▶"}</span>
-                <span style={{...LABEL, marginBottom:0, color:"#7c3a7a"}}>🔒 Secret</span>
-                {!char.secret && !isSectionOpen("secret") && <span style={{ fontSize:11, color:"#4a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-              </div>
+              {SectionHead("secret", "🔒 Secret", { emptyWhen:!char.secret, labelColor:"#7c3a7a" })}
               {isSectionOpen("secret") && (
                 <div style={{ padding:"0 24px 14px" }}>
                   {editingField==="secret"
@@ -912,12 +958,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
 
           {/* Factions */}
           <div style={{ flex:"1 1 50%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("factions")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("factions")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>⚑ Factions</span>
-              {!(char.factions||[]).filter(e=>e.factionId).length && !isSectionOpen("factions") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("factions", "⚑ Factions", { count:factionCount, emptyWhen:!factionCount })}
             {isSectionOpen("factions") && (
               <div style={{ padding:"0 24px 14px" }}>
                 {(char.factions||[]).map((entry,i)=>(
@@ -930,13 +971,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
 
           {/* Appears In */}
           <div style={{ flex:"1 1 50%", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("appearsIn")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("appearsIn")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>📜 Appears In</span>
-              {linkedStories.length > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({linkedStories.length})</span>}
-              {!linkedStories.length && !isSectionOpen("appearsIn") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("appearsIn", "📜 Appears In", { count:linkedStories.length, emptyWhen:!linkedStories.length })}
             {isSectionOpen("appearsIn") && (
               <div style={{ padding:"0 24px 14px" }}>
                 {linkedStories.length===0
@@ -959,13 +994,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
 
           {/* Relationships */}
           <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630" }}>
-            <div onClick={()=>toggleSection("relationships")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("relationships")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>🔗 Relationships</span>
-              {relationships.filter(r=>r.charId).length > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({relationships.filter(r=>r.charId).length})</span>}
-              {!relationships.filter(r=>r.charId).length && !isSectionOpen("relationships") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("relationships", "🔗 Relationships", { count:relCount, emptyWhen:!relCount })}
             {isSectionOpen("relationships") && (
               <div style={{ padding:"0 24px 14px" }}>
                 <RelationshipLinker relationships={relationships} chars={chars.filter(c=>c.id!==char.id)} relationshipTypes={relationshipTypes} onChange={updateRelationships} onOpenChar={onOpenChar}/>
@@ -975,13 +1004,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
 
           {/* External Links */}
           <div style={{ flex:"1 1 100%" }}>
-            <div onClick={()=>toggleSection("links")} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-              onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen("links")?"▼":"▶"}</span>
-              <span style={{...LABEL, marginBottom:0}}>🔗 External Links</span>
-              {(char.links||[]).length > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({(char.links||[]).length})</span>}
-              {!(char.links||[]).length && !isSectionOpen("links") && <span style={{ fontSize:11, color:"#3a2a5a", fontStyle:"italic", marginLeft:"auto" }}>empty</span>}
-            </div>
+            {SectionHead("links", "🔗 External Links", { count:(char.links||[]).length, emptyWhen:!(char.links||[]).length })}
             {isSectionOpen("links") && (
               <div style={{ padding:"0 24px 14px" }}>
                 {(char.links||[]).map((lnk,i)=>(
@@ -1002,7 +1025,14 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
                           <button onClick={()=>setEditingField(`link-${lnk.id}`)} style={{...btnSecondary,fontSize:11,padding:"3px 8px",flexShrink:0}}>✏️</button>
                         </>
                     }
-                    <button onClick={()=>updateLinks((char.links||[]).filter((_,j)=>j!==i))} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
+                    {confirmLinkIdx===i
+                      ? <>
+                          <span style={{ fontSize:11, color:"#c8b89a", flexShrink:0 }}>Remove?</span>
+                          <button onClick={()=>{ updateLinks((char.links||[]).filter((_,j)=>j!==i)); setConfirmLinkIdx(null); }} style={{...btnSecondary,fontSize:11,padding:"3px 8px",color:"#c06060",borderColor:"#6b1a1a",flexShrink:0}}>Yes</button>
+                          <button onClick={()=>setConfirmLinkIdx(null)} style={{...btnSecondary,fontSize:11,padding:"3px 8px",flexShrink:0}}>No</button>
+                        </>
+                      : <button onClick={()=>setConfirmLinkIdx(i)} style={{...btnSecondary,padding:"0 10px",color:"#c06060",flexShrink:0}}>✕</button>
+                    }
                   </div>
                 ))}
                 <button onClick={()=>{ updateLinks([...(char.links||[]),{id:uid(),label:"",url:""}]); if(!isSectionOpen("links")) setSectionToggles(t=>({...t,links:true})); }} style={{...btnSecondary,fontSize:12,padding:"4px 12px"}}>+ Add Link</button>
@@ -1013,7 +1043,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
         </div>
       )}
 
-      {subTab==="items" && <ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact}/>}
+      {subTab==="items" && <ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact} rarities={rarities}/>}
       {subTab==="timeline" && (
         <div style={{ padding:"20px 24px" }}>
           {charEvents.length===0

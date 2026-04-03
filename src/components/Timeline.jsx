@@ -137,6 +137,10 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
   const eraRefs = useRef({});
   const [activeKey, setActiveKey] = useState(null);
   const toggle = key => setCollapsed(c => ({...c, [key]: !c[key]}));
+  const highlightedEvent = highlightEventId ? events.find(e => e.id === highlightEventId) : null;
+  const highlightedGroupKey = highlightedEvent
+    ? `${highlightedEvent.year||""}|${highlightedEvent.month||""}|${highlightedEvent.day||""}`
+    : null;
 
   const jumpTo = key => {
     setActiveKey(key);
@@ -173,16 +177,12 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
 
   useEffect(() => {
     if (!highlightEventId) return;
-    const ev = events.find(e => e.id === highlightEventId);
-    if (!ev) return;
-    const key = `${ev.year||""}|${ev.month||""}|${ev.day||""}`;
-    setCollapsed(c => { if (c[key]) { const next = {...c}; delete next[key]; return next; } return c; });
     const timer = setTimeout(() => {
       const el = entryRefs.current[highlightEventId];
       if (el) { el.scrollIntoView({ behavior:"smooth", block:"center" }); }
     }, 80);
     return () => clearTimeout(timer);
-  }, [highlightEventId]); // eslint-disable-line
+  }, [highlightEventId]);
 
   const startAdd = (prefill) => {
     const key = prefill ? `${prefill.year||""}|${prefill.month||""}|${prefill.day||""}` : "__top__";
@@ -301,7 +301,7 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
                 {evChars.length > 0 && (
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                     {evChars.map(c => (
-                      <div key={c.id} onClick={()=>onOpenChar&&onOpenChar(c.id)} style={{ display:"flex", alignItems:"center", gap:7, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 10px 5px 6px", cursor: onOpenChar?"pointer":"default" }}
+                      <div key={c.id} onClick={()=>onOpenChar&&onOpenChar(c)} style={{ display:"flex", alignItems:"center", gap:7, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 10px 5px 6px", cursor: onOpenChar?"pointer":"default" }}
                         onMouseEnter={e=>{ if(onOpenChar) e.currentTarget.style.borderColor="#5a3da0"; }}
                         onMouseLeave={e=>{ if(onOpenChar) e.currentTarget.style.borderColor="#2a1f3d"; }}>
                         <Avatar src={c.image} name={c.name} size={26}/>
@@ -321,7 +321,7 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
     );
   };
 
-  const JumpBar = () => {
+  const renderJumpBar = () => {
     if (groupOrder.length === 0) return null;
     const items = [];
     groupOrder.forEach((key, i) => {
@@ -388,7 +388,7 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
   };
 
   const renderGroup = (group, labelOverride, dimmed) => {
-    const isOpen = !collapsed[group.key];
+    const isOpen = group.key === highlightedGroupKey || !collapsed[group.key];
     const label = labelOverride || formatEventDate({year:group.year, month:group.month, day:group.day}) || "No date";
     const groupAddKey = `${group.year||""}|${group.month||""}|${group.day||""}`;
     const isActive = activeKey === group.key;
@@ -414,7 +414,7 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
 
   return (
     <div>
-      <JumpBar/>
+      {renderJumpBar()}
       {/* Top new event */}
       <div style={{ display:"flex", justifyContent:"flex-end", marginBottom: addingGroupKey==="__top__" ? 0 : 12 }}>
         {addingGroupKey !== "__top__" && (

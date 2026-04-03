@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { inputStyle, btnSecondary, RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from "../constants.js";
+import { inputStyle, RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from "../constants.js";
 import { uid } from "../utils.jsx";
 import Avatar from "./Avatar.jsx";
 
@@ -68,7 +68,7 @@ export default function RelationshipLinker({ relationships, chars, relationshipT
                   draggable
                   onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; setDragId(c.id); }}
                   onDragEnd={()=>{ setDragId(null); setDragOverType(null); }}
-                  style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"6px 8px", cursor:"grab", opacity:dragId===c.id?.4:1, transition:"opacity .1s" }}>
+                  style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"6px 8px", cursor:"grab", opacity: dragId === c.id ? 0.4 : 1, transition:"opacity .1s" }}>
                   <Avatar src={c.image} name={c.name} size={26}/>
                   <span
                     onClick={e=>{ e.stopPropagation(); onOpenChar&&onOpenChar(c); }}
