@@ -3,6 +3,27 @@ import { btnPrimary, btnSecondary, ghostInput, inputStyle } from "../../constant
 import { uid } from "../../utils.jsx";
 import Avatar from "../Avatar.jsx";
 import EventModal from "../EventModal.jsx";
+import HookCard from "../HookCard.jsx";
+// ── Hook preview (rows model, with legacy fallback) ───────────────────────────
+const _EI = { character:"👤", faction:"⚑", location:"📍", story:"📜", artifact:"⚗️" };
+function HookBlocksPreview({ hook }) {
+  const rows = hook.rows
+    || (hook.blocks ? hook.blocks.filter(b=>b.type==="text").map(b=>({ text:b.content, entities:[] })) : null)
+    || (hook.description ? [{ text:hook.description, entities:[] }] : []);
+  if (!rows.length) return null;
+  return (
+    <div style={{ marginBottom:8 }}>
+      {rows.slice(0,3).map((r,i) => (
+        <div key={i}>
+          {r.text && <div style={{ fontSize:12, color:"#9a8272", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{r.text}</div>}
+          {(r.entities||[]).slice(0,3).map((e,j) =>
+            <span key={j} style={{ display:"inline-flex", alignItems:"center", gap:3, background:"#1a1230", border:"1px solid #3a2a5a", borderRadius:10, padding:"1px 7px 1px 5px", fontSize:11, color:"#c8b89a", marginRight:4, marginBottom:2 }}>{_EI[e.entityType]} {e.name}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ── Multi-character picker ────────────────────────────────────────────────────
 function MultiCharPicker({ chars, selectedIds, onChange }) {
@@ -94,21 +115,15 @@ function StoryPickerModal({ stories, storyStatuses, onClose, onSelect }) {
 }
 
 // ── Notes Tab ─────────────────────────────────────────────────────────────────
-function NotesTabContent({ notes, setNotes, chars, stories, setStories, onOpenStory, onOpenChar, onPinHook, onPinCharHook, onRemovePin, hookStatuses, storyStatuses, onUpdateStory, onUpdateChar }) {
-  const [newPin, setNewPin] = useState("");
-  const [newPinCharIds, setNewPinCharIds] = useState([]);
+function NotesTabContent({ notes, setNotes, chars, factions, locations, stories, artifacts, setStories, onOpenStory, onOpenChar, onPinHook, onPinCharHook, hookStatuses, storyStatuses, onUpdateStory, onUpdateChar }) {
   const [addingSession, setAddingSession] = useState(false);
   const [sessionForm, setSessionForm] = useState({ title:"", year:"", month:"", day:"" });
   const [collapsed, setCollapsed] = useState({});
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editSessionForm, setEditSessionForm] = useState({ title:"", year:"", month:"", day:"" });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [editingPinId, setEditingPinId] = useState(null);
-  const [editPinText, setEditPinText] = useState("");
-  const [editPinCharIds, setEditPinCharIds] = useState([]);
-  const [confirmDeletePinId, setConfirmDeletePinId] = useState(null);
-  const dragPinRef = useRef(null);
-  const [dragOverPinId, setDragOverPinId] = useState(null);
+  const dragItemRef = useRef(null);
+  const [dragOverItemKey, setDragOverItemKey] = useState(null);
   const scratchRef = useRef(null);
   const [newEventText, setNewEventText] = useState({});
   const [editingEventId, setEditingEventId] = useState(null);
@@ -127,28 +142,86 @@ function NotesTabContent({ notes, setNotes, chars, stories, setStories, onOpenSt
 
   const allChars = (chars||[]).filter(c => c.type === "main" || c.type === "side" || c.type === "player");
 
-  const addPin = () => {
-    const t = newPin.trim();
-    if (!t) return;
-    setNotes(n => ({...n, pins:[{id:uid(), text:t, charIds:newPinCharIds}, ...n.pins]}));
-    setNewPin("");
-    setNewPinCharIds([]);
+  // ── GM Hooks (notes-tab hooks) ────────────────────────────────────────────
+  const gmHooks      = notes.hooks || [];
+  const gmHookStatuses = hookStatuses || [];
+  const gmColorMap   = Object.fromEntries(gmHookStatuses.map(s => [s.name, s.color]));
+  const defaultStatus = gmHookStatuses[0]?.name || "Potential";
+
+  const addGmHook = () => setNotes(n => ({
+    ...n,
+    hooks: [...(n.hooks||[]), { id:uid(), title:"New hook", status:defaultStatus, blocks:[] }]
+  }));
+  const updateGmHook = updated => {
+    setNotes(n => ({ ...n, hooks: (n.hooks||[]).map(h => h.id === updated.id ? updated : h) }));
+    // Keep story copy in sync
+    if (updated.linkedStoryId) {
+      setStories(prev => prev.map(st => st.id === updated.linkedStoryId
+        ? { ...st, hooks: (st.hooks||[]).map(h => h.id === updated.id ? updated : h) }
+        : st
+      ));
+    }
+  };
+  const removeGmHook = id => {
+    const hook = (notes.hooks||[]).find(h => h.id === id);
+    if (hook?.linkedStoryId) {
+      setStories(prev => prev.map(st => st.id === hook.linkedStoryId
+        ? { ...st, hooks: (st.hooks||[]).filter(h => h.id !== id) }
+        : st
+      ));
+    }
+    setNotes(n => ({ ...n, hooks: (n.hooks||[]).filter(h => h.id !== id) }));
+  };
+  const linkGmHookStory = (hookId, storyId) => {
+    const hook = (notes.hooks||[]).find(h => h.id === hookId);
+    setNotes(n => ({ ...n, hooks: (n.hooks||[]).map(h => h.id===hookId ? {...h, linkedStoryId:storyId} : h) }));
+    // Add to story's hooks so it shows up in the story panel
+    if (hook) {
+      setStories(prev => prev.map(st => st.id === storyId
+        ? { ...st, hooks: [...(st.hooks||[]).filter(h => h.id !== hookId), {...hook, linkedStoryId:storyId}] }
+        : st
+      ));
+    }
+  };
+  const unlinkGmHookStory = (hookId) => {
+    const hook = (notes.hooks||[]).find(h => h.id === hookId);
+    if (hook?.linkedStoryId) {
+      setStories(prev => prev.map(st => st.id === hook.linkedStoryId
+        ? { ...st, hooks: (st.hooks||[]).filter(h => h.id !== hookId) }
+        : st
+      ));
+    }
+    setNotes(n => ({ ...n, hooks: (n.hooks||[]).map(h => h.id===hookId ? {...h, linkedStoryId:null} : h) }));
   };
 
-  const removePin = id => { onRemovePin(id); setConfirmDeletePinId(null); };
-  const reorderPin = (fromId, toId) => setNotes(n => {
-    const pins = [...(n.pins||[])];
-    const from = pins.findIndex(p=>p.id===fromId);
-    const to   = pins.findIndex(p=>p.id===toId);
-    if (from===-1||to===-1||from===to) return n;
-    const [item] = pins.splice(from, 1);
-    pins.splice(to, 0, item);
-    return {...n, pins};
-  });
-  const togglePinDone = id => setNotes(n => ({...n, pins: n.pins.map(p => p.id===id ? {...p, done:!p.done} : p)}));
-  const saveEditPin = () => {
-    if (editPinText.trim()) setNotes(n => ({...n, pins: n.pins.map(p => p.id===editingPinId ? {...p, text:editPinText.trim(), charIds:editPinCharIds} : p)}));
-    setEditingPinId(null);
+  // ── Unified hook list order (GM hooks + pinned, all reorderable together) ──
+  const getHookListOrder = (n) => {
+    const stored = (n||notes).hookListOrder || [];
+    const gmIds  = new Set(((n||notes).hooks||[]).map(h=>h.id));
+    const pinIds = new Set(((n||notes).pins||[]).filter(p=>p.hookPin||p.charHookPin).map(p=>p.id));
+    const valid  = stored.filter(x => (x.kind==="gm"&&gmIds.has(x.id)) || (x.kind==="pin"&&pinIds.has(x.id)));
+    const orderedGm  = new Set(valid.filter(x=>x.kind==="gm").map(x=>x.id));
+    const orderedPin = new Set(valid.filter(x=>x.kind==="pin").map(x=>x.id));
+    const newItems = [
+      ...((n||notes).hooks||[]).filter(h=>!orderedGm.has(h.id)).map(h=>({kind:"gm",id:h.id})),
+      ...((n||notes).pins||[]).filter(p=>(p.hookPin||p.charHookPin)&&!orderedPin.has(p.id)).map(p=>({kind:"pin",id:p.id})),
+    ];
+    return [...valid, ...newItems];
+  };
+  const hookListOrder = getHookListOrder();
+
+  const reorderHookList = (fromKey, toKey) => {
+    if (!fromKey || fromKey === toKey) return;
+    setNotes(n => {
+      const order = getHookListOrder(n);
+      const from = order.findIndex(x=>`${x.kind}:${x.id}`===fromKey);
+      const to   = order.findIndex(x=>`${x.kind}:${x.id}`===toKey);
+      if (from===-1||to===-1||from===to) return n;
+      const next = [...order];
+      const [item] = next.splice(from,1);
+      next.splice(to,0,item);
+      return {...n, hookListOrder:next};
+    });
   };
 
   const saveSession = () => {
@@ -250,174 +323,115 @@ function NotesTabContent({ notes, setNotes, chars, stories, setStories, onOpenSt
       <div style={{ display:"flex", gap:24, alignItems:"flex-start" }}>
         {/* Left column: Pins + Scratch Pad */}
         <div style={{ flex:"1 1 320px", minWidth:260 }}>
-          {/* Pinned Reminders */}
+          {/* GM Hooks */}
           <div style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden", marginBottom:20 }}>
-            <div style={{ padding:"12px 18px", borderBottom:"1px solid #2a1f3d" }}>
-              <span style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>📌 Pinned Reminders</span>
+            <div style={{ padding:"12px 18px", borderBottom:"1px solid #2a1f3d", display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ color:"#c8a96e", fontFamily:"Georgia,serif", fontSize:15, fontWeight:700 }}>📌 GM Hooks</span>
+              <button onClick={addGmHook} style={{ marginLeft:"auto", fontSize:11, color:"#9a7fa0", background:"#1a1230", border:"1px solid #3a2a5a", borderRadius:6, padding:"3px 10px", cursor:"pointer" }}
+                onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
+                onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>+ New Hook</button>
             </div>
-            <div style={{ padding:"12px 18px", borderBottom:"1px solid #1e1630", display:"flex", flexDirection:"column", gap:8 }}>
-              <textarea
-                value={newPin}
-                onChange={e => setNewPin(e.target.value)}
-                onKeyDown={e => { if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); addPin(); } }}
-                placeholder="Add a reminder… (Enter to pin, Shift+Enter for new line)"
-                rows={2}
-                style={{ width:"100%", background:"#0d0b14", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:"#e8d5b7", fontSize:13, outline:"none", resize:"vertical", lineHeight:1.5, boxSizing:"border-box" }}
-              />
-              <MultiCharPicker chars={allChars} selectedIds={newPinCharIds} onChange={setNewPinCharIds}/>
-              <button onClick={addPin} style={{ ...btnSecondary, fontSize:13 }}>Pin</button>
-            </div>
-            <div style={{ minHeight:40 }}>
-              {(notes.pins||[]).length === 0
-                ? <div style={{ color:"#3a2a5a", fontSize:13, textAlign:"center", padding:"16px 18px" }}>No reminders pinned yet.</div>
-                : (notes.pins||[]).map(p => {
-                  const isDragOver = dragOverPinId === p.id;
-                  const dragHandleStyle = { fontSize:14, color:"#3a2a5a", cursor:"grab", padding:"2px 4px", flexShrink:0, lineHeight:1, userSelect:"none" };
-
-                  // ── Story hook pin ──
-                  if (p.hookPin) {
-                    const story = (stories||[]).find(s=>s.id===p.storyId);
-                    const hook = story && (story.hooks||[]).find(h=>h.id===p.hookId);
-                    if (!story || !hook) return null;
-                    const statuses = hookStatuses || [];
-                    const colorMap = Object.fromEntries(statuses.map(s=>[s.name, s.color]));
-                    const sc = colorMap[hook.status] || "#7c5cbf";
-                    return (
-                      <div key={p.id} draggable
-                        onDragStart={()=>{ dragPinRef.current=p.id; }}
-                        onDragOver={e=>{ e.preventDefault(); setDragOverPinId(p.id); }}
-                        onDragLeave={()=>setDragOverPinId(null)}
-                        onDrop={e=>{ e.preventDefault(); reorderPin(dragPinRef.current,p.id); setDragOverPinId(null); }}
-                        onDragEnd={()=>{ dragPinRef.current=null; setDragOverPinId(null); }}
-                        style={{ borderBottom:"1px solid #1e1630", padding:"10px 10px 10px 0", background:isDragOver?"#1e1630":"#0f0c1a", borderLeft:`3px solid ${sc}88`, transition:"background .1s" }}>
-                        <div style={{ display:"flex", alignItems:"flex-start", gap:6 }}>
-                          <span style={dragHandleStyle}>⠿</span>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5 }}>
-                              <span style={{ fontSize:10, color:"#5a4a7a", textTransform:"uppercase", letterSpacing:.8, fontWeight:600 }}>Plot Hook</span>
-                              <span style={{ fontSize:10, color:"#3a2a5a" }}>·</span>
-                              <span onClick={()=>onOpenStory(story, null, { storySubTab:"hooks" })} style={{ fontSize:11, color:"#c8a96e", cursor:"pointer", fontWeight:700 }}>{story.name} ↗</span>
-                            </div>
-                            <div onClick={()=>onOpenStory(story, null, { storySubTab:"hooks" })} style={{ fontSize:13, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", marginBottom: hook.description ? 5 : 6, cursor:"pointer" }}
-                              onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#e8d5b7"}>{hook.title}</div>
-                            {hook.description && <div style={{ fontSize:12, color:"#9a8272", lineHeight:1.55, whiteSpace:"pre-wrap", marginBottom:8 }}>{hook.description}</div>}
-                            {statuses.length > 0 && (
-                              <select value={hook.status || statuses[0]?.name || ""}
-                                onChange={e => onUpdateStory?.({...story, hooks: (story.hooks||[]).map(h => h.id===hook.id ? {...h, status: e.target.value} : h)})}
-                                style={{ fontSize:11, background:"#1a1228", border:`1px solid ${sc}66`, borderRadius:6, color:sc, padding:"3px 8px", cursor:"pointer", outline:"none" }}>
-                                {statuses.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                              </select>
-                            )}
-                          </div>
-                          <button onClick={()=>onPinHook(story.id, hook.id)} title="Unpin" style={{ background:"none", border:"none", color:"#4a3a5a", cursor:"pointer", fontSize:13, padding:"2px 4px", flexShrink:0 }}
-                            onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#4a3a5a"}>📌</button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // ── Char hook pin ──
-                  if (p.charHookPin) {
-                    const ch = (chars||[]).find(c=>c.id===p.charId);
-                    const hook = ch && (ch.hooks||[]).find(h=>h.id===p.hookId);
-                    if (!ch || !hook) return null;
-                    const statuses = hookStatuses || [];
-                    const colorMap = Object.fromEntries(statuses.map(s=>[s.name, s.color]));
-                    const sc = colorMap[hook.status] || "#7c5cbf";
-                    return (
-                      <div key={p.id} draggable
-                        onDragStart={()=>{ dragPinRef.current=p.id; }}
-                        onDragOver={e=>{ e.preventDefault(); setDragOverPinId(p.id); }}
-                        onDragLeave={()=>setDragOverPinId(null)}
-                        onDrop={e=>{ e.preventDefault(); reorderPin(dragPinRef.current,p.id); setDragOverPinId(null); }}
-                        onDragEnd={()=>{ dragPinRef.current=null; setDragOverPinId(null); }}
-                        style={{ borderBottom:"1px solid #1e1630", padding:"10px 10px 10px 0", background:isDragOver?"#1e1630":"#0f0c1a", borderLeft:`3px solid ${sc}88`, transition:"background .1s" }}>
-                        <div style={{ display:"flex", alignItems:"flex-start", gap:6 }}>
-                          <span style={dragHandleStyle}>⠿</span>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:5 }}>
-                              <Avatar src={ch.image} name={ch.name} size={24}/>
-                              <div>
-                                <div style={{ fontSize:10, color:"#5a4a7a", textTransform:"uppercase", letterSpacing:.8, fontWeight:600 }}>Character Hook</div>
-                                <span onClick={()=>onOpenChar(ch, { charSubTab:"hooks" })} style={{ fontSize:11, color:"#c8a96e", cursor:"pointer", fontWeight:700 }}>{ch.name} ↗</span>
-                              </div>
-                            </div>
-                            <div onClick={()=>onOpenChar(ch, { charSubTab:"hooks" })} style={{ fontSize:13, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", marginBottom: hook.description ? 5 : 6, cursor:"pointer" }}
-                              onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#e8d5b7"}>{hook.title}</div>
-                            {hook.description && <div style={{ fontSize:12, color:"#9a8272", lineHeight:1.55, whiteSpace:"pre-wrap", marginBottom:8 }}>{hook.description}</div>}
-                            {statuses.length > 0 && (
-                              <select value={hook.status || statuses[0]?.name || ""}
-                                onChange={e => onUpdateChar?.({...ch, hooks: (ch.hooks||[]).map(h => h.id===hook.id ? {...h, status: e.target.value} : h)})}
-                                style={{ fontSize:11, background:"#1a1228", border:`1px solid ${sc}66`, borderRadius:6, color:sc, padding:"3px 8px", cursor:"pointer", outline:"none" }}>
-                                {statuses.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                              </select>
-                            )}
-                          </div>
-                          <button onClick={()=>onPinCharHook(ch.id, hook.id)} title="Unpin" style={{ background:"none", border:"none", color:"#4a3a5a", cursor:"pointer", fontSize:13, padding:"2px 4px", flexShrink:0 }}
-                            onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"} onMouseLeave={e=>e.currentTarget.style.color="#4a3a5a"}>📌</button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // ── Regular note pin ──
-                  const pinChars = (p.charIds?.length ? p.charIds : p.charId ? [p.charId] : []).map(id => allChars.find(c=>c.id===id)).filter(Boolean);
+            {/* All hooks: GM + pinned, unified drag-to-reorder */}
+            {hookListOrder.length === 0
+              ? <div style={{ color:"#3a2a5a", fontSize:13, textAlign:"center", padding:"16px 18px" }}>No hooks yet. Add one to track plans, ideas, or upcoming scenes.</div>
+              : (() => {
+                  const statuses = hookStatuses || [];
+                  const colorMap = Object.fromEntries(statuses.map(s=>[s.name, s.color]));
+                  const handleStyle = { fontSize:18, color:"#c8a96e66", cursor:"grab", padding:"0 4px", flexShrink:0, lineHeight:1, userSelect:"none" };
                   return (
-                    <div key={p.id} draggable={editingPinId !== p.id && confirmDeletePinId !== p.id}
-                      onDragStart={()=>{ dragPinRef.current=p.id; }}
-                      onDragOver={e=>{ e.preventDefault(); setDragOverPinId(p.id); }}
-                      onDragLeave={()=>setDragOverPinId(null)}
-                      onDrop={e=>{ e.preventDefault(); reorderPin(dragPinRef.current,p.id); setDragOverPinId(null); }}
-                      onDragEnd={()=>{ dragPinRef.current=null; setDragOverPinId(null); }}
-                      style={{ borderBottom:"1px solid #1e1630", background:isDragOver?"#1e1630":p.done?"#111820":"transparent", borderLeft:`3px solid ${p.done?"#4a9a4a":"#2a1f3d"}`, transition:"background .1s" }}>
-                      {editingPinId === p.id ? (
-                        <div style={{ display:"flex", flexDirection:"column", gap:6, padding:"8px 14px" }}>
-                          <textarea value={editPinText} onChange={e=>setEditPinText(e.target.value)} onKeyDown={e=>{ if(e.key==="Escape") setEditingPinId(null); }}
-                            autoFocus rows={3} style={{ ...ghostInput, width:"100%", resize:"vertical", lineHeight:1.5, boxSizing:"border-box", borderColor:"#7c5cbf", color:"#e8d5b7" }}/>
-                          <MultiCharPicker chars={allChars} selectedIds={editPinCharIds} onChange={setEditPinCharIds}/>
-                          <div style={{ display:"flex", gap:6 }}>
-                            <button onClick={saveEditPin} style={{ ...btnPrimary, flex:1, fontSize:12, padding:"5px 10px" }}>Save</button>
-                            <button onClick={()=>setEditingPinId(null)} style={{ ...btnSecondary, flex:1, fontSize:12, padding:"5px 10px" }}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : confirmDeletePinId === p.id ? (
-                        <div style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 14px", background:"#1a0d0d" }}>
-                          <span style={{ flex:1, fontSize:12, color:"#c8b89a" }}>Delete <strong>"{p.text.slice(0,40)}{p.text.length>40?"…":""}"</strong>?</span>
-                          <button onClick={()=>removePin(p.id)} style={{ background:"#6b1a1a", color:"#e8d5b7", border:"none", borderRadius:6, padding:"4px 12px", cursor:"pointer", fontWeight:700, fontSize:12 }}>Delete</button>
-                          <button onClick={()=>setConfirmDeletePinId(null)} style={{ ...btnSecondary, padding:"4px 12px", fontSize:12 }}>Cancel</button>
-                        </div>
-                      ) : (
-                        <div style={{ display:"flex", alignItems:"flex-start", gap:6, padding:"8px 10px 8px 0" }}>
-                          <span style={dragHandleStyle}>⠿</span>
-                          <input type="checkbox" checked={!!p.done} onChange={()=>togglePinDone(p.id)}
-                            style={{ width:15, height:15, accentColor:"#7c5cbf", cursor:"pointer", flexShrink:0, marginTop:3 }}/>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <span style={{ fontSize:13, color:p.done?"#5a6a5a":"#e8d5b7", lineHeight:1.5, overflowWrap:"break-word", wordBreak:"break-word", textDecoration:p.done?"line-through":"none", opacity:p.done?.7:1 }}>{p.text}</span>
-                            {pinChars.length > 0 && (
-                              <div style={{ display:"flex", flexDirection:"row", flexWrap:"wrap", gap:8, marginTop:6 }}>
-                                {pinChars.map(pc => (
-                                  <div key={pc.id} onClick={() => onOpenChar?.(pc)} style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", background:"#1a1228", border:"1px solid #2a1f3d", borderRadius:20, padding:"3px 10px 3px 4px" }}
-                                    onMouseEnter={e => { e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.querySelector(".pin-char-name").style.color="#a07ee8"; }}
-                                    onMouseLeave={e => { e.currentTarget.style.borderColor="#2a1f3d"; e.currentTarget.querySelector(".pin-char-name").style.color="#7c5cbf"; }}>
-                                    <Avatar src={pc.image} name={pc.name} size={18}/>
-                                    <span className="pin-char-name" style={{ fontSize:11, color:"#7c5cbf", fontWeight:600, transition:"color .12s", whiteSpace:"nowrap" }}>{pc.name} ↗</span>
-                                  </div>
-                                ))}
+                    <div style={{ display:"flex", flexDirection:"column", gap:10, padding:10 }}>
+                      {hookListOrder.map(entry => {
+                        const itemKey = `${entry.kind}:${entry.id}`;
+                        const isOver = dragOverItemKey === itemKey;
+                        const wrapStyle = { display:"flex", alignItems:"center", gap:4, background:isOver?"#1a1535":"transparent", borderRadius:8, outline:isOver?"1px solid #3a2a5a":"none", transition:"background .1s" };
+                        const wrapHandlers = {
+                          onDragOver: e=>{ e.preventDefault(); setDragOverItemKey(itemKey); },
+                          onDragLeave: ()=>setDragOverItemKey(null),
+                          onDrop: e=>{ e.preventDefault(); reorderHookList(dragItemRef.current, itemKey); setDragOverItemKey(null); },
+                        };
+                        const handle = (
+                          <span draggable
+                            onDragStart={()=>{ dragItemRef.current=itemKey; }}
+                            onDragEnd={()=>{ dragItemRef.current=null; setDragOverItemKey(null); }}
+                            style={handleStyle}
+                            onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"}
+                            onMouseLeave={e=>e.currentTarget.style.color="#c8a96e66"}>⠿</span>
+                        );
+
+                        if (entry.kind === "gm") {
+                          const h = gmHooks.find(x=>x.id===entry.id);
+                          if (!h) return null;
+                          return (
+                            <div key={itemKey} style={wrapStyle} {...wrapHandlers}>
+                              {handle}
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <HookCard hook={h}
+                                  onUpdate={updateGmHook}
+                                  onRemove={() => removeGmHook(h.id)}
+                                  statuses={gmHookStatuses} colorMap={gmColorMap}
+                                  chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}
+                                  onLinkStory={storyId => linkGmHookStory(h.id, storyId)}
+                                  onUnlinkStory={() => unlinkGmHookStory(h.id)}
+                                />
                               </div>
-                            )}
-                          </div>
-                          <button onClick={()=>{ setEditingPinId(p.id); setEditPinText(p.text); setEditPinCharIds(p.charIds || (p.charId ? [p.charId] : [])); }} style={{ background:"none", border:"none", color:"#3a2a5a", cursor:"pointer", fontSize:13, padding:"2px 4px", flexShrink:0 }}
-                            onMouseEnter={e=>e.currentTarget.style.color="#9a7fe0"} onMouseLeave={e=>e.currentTarget.style.color="#3a2a5a"}>✏️</button>
-                          <button onClick={()=>setConfirmDeletePinId(p.id)} style={{ background:"none", border:"none", color:"#2a1f3a", cursor:"pointer", fontSize:13, padding:"2px 4px", flexShrink:0 }}
-                            onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#2a1f3a"}>🗑️</button>
-                        </div>
-                      )}
+                            </div>
+                          );
+                        }
+
+                        if (entry.kind === "pin") {
+                          const p = (notes.pins||[]).find(x=>x.id===entry.id);
+                          if (!p) return null;
+                          if (p.hookPin) {
+                            const story = (stories||[]).find(s=>s.id===p.storyId);
+                            const hook = story && (story.hooks||[]).find(h=>h.id===p.hookId);
+                            if (!story || !hook) return null;
+                            return (
+                              <div key={itemKey} style={wrapStyle} {...wrapHandlers}>
+                                {handle}
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <HookCard hook={hook}
+                                    onUpdate={updated => onUpdateStory?.({...story, hooks:(story.hooks||[]).map(h=>h.id===updated.id?updated:h)})}
+                                    onPin={() => onPinHook(story.id, hook.id)}
+                                    isPinned={true}
+                                    statuses={statuses} colorMap={colorMap}
+                                    chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}
+                                    sourceName={story.name}
+                                    onOpenSource={() => onOpenStory(story, null, { storySubTab:"hooks" })}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+                          if (p.charHookPin) {
+                            const ch = (chars||[]).find(c=>c.id===p.charId);
+                            const hook = ch && (ch.hooks||[]).find(h=>h.id===p.hookId);
+                            if (!ch || !hook) return null;
+                            return (
+                              <div key={itemKey} style={wrapStyle} {...wrapHandlers}>
+                                {handle}
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <HookCard hook={hook}
+                                    onUpdate={updated => onUpdateChar?.({...ch, hooks:(ch.hooks||[]).map(h=>h.id===updated.id?updated:h)})}
+                                    onPin={() => onPinCharHook(ch.id, hook.id)}
+                                    isPinned={true}
+                                    statuses={statuses} colorMap={colorMap}
+                                    chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}
+                                    sourceName={ch.name}
+                                    onOpenSource={() => onOpenChar(ch, { charSubTab:"hooks" })}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
+                        return null;
+                      })}
                     </div>
                   );
-                })
-              }
-            </div>
+                })()
+            }
           </div>
+
 
           {/* Scratch Pad */}
           <div style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:12, overflow:"hidden" }}>

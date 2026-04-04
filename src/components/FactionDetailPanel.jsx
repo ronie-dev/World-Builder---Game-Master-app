@@ -436,8 +436,14 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
                 onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
                 onBlur={()=>{ updateTextTab(activeTextTab, fieldVal); setEditingField(null); }}
                 onKeyDown={e=>{ if(e.key==="Escape") { setEditingField(null); setFieldVal(""); } }}
-                style={ghostTextarea}/>
-            : <div onClick={()=>startEdit("__text__"+activeTextTab, activeTabContent)} {...fh} style={{ borderRadius:4, cursor:"text", minHeight:60, padding:"4px 2px" }}>
+                onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+                onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+                onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+                style={{ ...ghostTextarea, borderColor:"transparent" }}/>
+            : <div onClick={()=>startEdit("__text__"+activeTextTab, activeTabContent)}
+                onMouseEnter={e=>{ e.currentTarget.style.background="#ffffff0a"; e.currentTarget.style.outline="1px solid #2a1f3d"; }}
+                onMouseLeave={e=>{ e.currentTarget.style.background="transparent"; e.currentTarget.style.outline="none"; }}
+                style={{ borderRadius:4, cursor:"text", minHeight:60, padding:"4px 2px" }}>
                 {activeTabContent
                   ? <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{activeTabContent}</div>
                   : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add {allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…</span>}

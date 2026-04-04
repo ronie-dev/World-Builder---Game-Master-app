@@ -450,7 +450,7 @@ export default function App() {
     tab: "characters",
     selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null,
     charSubTab: "details", storySubTab: "details",
-    charEditing: false, storyEditing: false, factionEditing: false, locationEditing: false,
+    charEditing: false, storyEditing: false, factionEditing: false,
     prevTab: null, itemNavId: null, storyHighlightEventId: null, mapNavTarget: null,
     query: "", storyQuery: "", storyStatusFilter: "", locationQuery: "", locationTypeFilter: "",
     collapsedLocTypes: {}, filters: defaultFilters, mainCollapsed: false, sideCollapsed: false,
@@ -1326,15 +1326,16 @@ export default function App() {
                   onNewLocation={openLocationModal}
                   onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
                   onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction}
+                  onSaveFaction={saveFaction}
                   onShowOnMap={handleShowOnMap}
-                  isEditing={p.locationEditing} onSetEditing={v=>pageUpdPg({ locationEditing: v })} locationTypes={locationTypes}/>
+                  locationTypes={locationTypes}/>
               </div>
               <div style={{ display: p.tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={p.itemNavId} rarities={rarities}/></div>
               <div style={{ display: p.tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={p.mapNavTarget} locationTypes={locationTypes}/></div>
               <div style={{ display: p.tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} deities={deities} onUpdateDeities={updateDeities} factions={factions} locations={locations} deityAlignments={deityAlignments} eras={eras}/></div></div>
               <div style={{ display: p.tab==="relations" ? "contents" : "none" }}><div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}><RelationshipWeb chars={chars} stories={stories} relationshipTypes={relationshipTypes} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory}/></div></div>
               <div style={{ display: p.tab==="gallery" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><GalleryTabContent images={galleryImages} galleryEntries={galleryEntries} onUpdateEntries={setGalleryEntries}/></div></div>
-              <div style={{ display: p.tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTabContent notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onPinCharHook={handlePinCharHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} storyStatuses={storyStatuses} onUpdateStory={updateStory} onUpdateChar={updateChar}/></div></div>
+              <div style={{ display: p.tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTabContent notes={notes} setNotes={setNotes} chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onPinCharHook={handlePinCharHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} storyStatuses={storyStatuses} onUpdateStory={updateStory} onUpdateChar={updateChar}/></div></div>
               <div style={{ display: p.tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} locationTypes={locationTypes} setLocationTypes={setLocationTypes} rarities={rarities} setRarities={setRarities} deityAlignments={deityAlignments} setDeityAlignments={setDeityAlignments} setChars={updateCharsFromSettings} eras={eras} setEras={setEras}/></div></div>
             </div>
           );

@@ -6,6 +6,7 @@ import Avatar from "./Avatar.jsx";
 import LinkBadge from "./LinkBadge.jsx";
 import FilesPanel from "./FilesPanel.jsx";
 import RelationshipLinker from "./RelationshipLinker.jsx";
+import HookCard from "./HookCard.jsx";
 import Lightbox from "./Lightbox.jsx";
 import PortraitZone from "./PortraitZone.jsx";
 
@@ -153,52 +154,24 @@ const DEFAULT_HOOK_STATUSES = [
   { name:"Abandoned", color:"#6a4a4a" },
 ];
 
-function CharHooksTab({ char, onUpdateChar, hookStatuses, onPinHook, pinnedHookIds }) {
+function CharHooksTab({ char, onUpdateChar, hookStatuses, onPinHook, pinnedHookIds, chars, factions, locations, stories, artifacts }) {
   const statuses = hookStatuses || DEFAULT_HOOK_STATUSES;
   const colorMap = Object.fromEntries(statuses.map(s => [s.name, s.color]));
   const defaultStatus = statuses[0]?.name || "Potential";
-  const [addingNew, setAddingNew] = useState(false);
-  const [newForm, setNewForm] = useState({ title:"", description:"", status:defaultStatus });
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const hooks = char.hooks || [];
-
-  const saveNew = () => {
-    if (!newForm.title.trim()) return;
-    onUpdateChar({ ...char, hooks: [...hooks, { ...newForm, id: uid() }] });
-    setNewForm({ title:"", description:"", status: defaultStatus });
-    setAddingNew(false);
-  };
-  const saveEdit = () => {
-    onUpdateChar({ ...char, hooks: hooks.map(h => h.id === editingId ? { ...h, ...editForm } : h) });
-    setEditingId(null);
-  };
+  const addHook = () => onUpdateChar({ ...char, hooks: [...hooks, { id: uid(), title:"New hook", description:"", status: defaultStatus, linkedEntities:[] }] });
+  const updateHook = updated => onUpdateChar({ ...char, hooks: hooks.map(h => h.id === updated.id ? updated : h) });
   const removeHook = id => onUpdateChar({ ...char, hooks: hooks.filter(h => h.id !== id) });
 
   return (
     <div style={{ padding:"16px 24px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:11, color:"#7c5cbf", letterSpacing:1, textTransform:"uppercase" }}>🔮 Character Hooks & Story Threads</div>
-        {!addingNew && <button onClick={() => setAddingNew(true)} style={{...btnPrimary, fontSize:12, padding:"6px 14px"}}>+ Add Hook</button>}
+        <button onClick={addHook} style={{...btnPrimary, fontSize:12, padding:"6px 14px"}}>+ Add Hook</button>
       </div>
 
-      {addingNew && (
-        <div style={{ background:"#0f0c1a", border:"1px solid #7c5cbf", borderRadius:10, padding:16, marginBottom:14 }}>
-          <input value={newForm.title} onChange={e => setNewForm(f => ({...f, title:e.target.value}))} placeholder="Hook title…" style={{...inputStyle, marginBottom:8}}/>
-          <textarea value={newForm.description} onChange={e => setNewForm(f => ({...f, description:e.target.value}))} placeholder="Potential story thread, character goal, secret agenda…" rows={4} style={{...inputStyle, resize:"vertical", marginBottom:8}}/>
-          <select value={newForm.status} onChange={e => setNewForm(f => ({...f, status:e.target.value}))} style={{...selStyle, marginBottom:12}}>
-            {statuses.map(s => <option key={s.name}>{s.name}</option>)}
-          </select>
-          <div style={{ display:"flex", gap:8 }}>
-            <button onClick={saveNew} disabled={!newForm.title.trim()} style={{...btnPrimary, flex:1, fontSize:12}}>Add Hook</button>
-            <button onClick={() => { setAddingNew(false); setNewForm({title:"",description:"",status:defaultStatus}); }} style={{...btnSecondary, flex:1, fontSize:12}}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {hooks.length === 0 && !addingNew && (
+      {hooks.length === 0 && (
         <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a" }}>
           <div style={{ fontSize:36, marginBottom:10 }}>🔮</div>
           <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>No hooks yet.</div>
@@ -207,49 +180,23 @@ function CharHooksTab({ char, onUpdateChar, hookStatuses, onPinHook, pinnedHookI
       )}
 
       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-        {hooks.map(h => {
-          const sc = colorMap[h.status] || "#7c5cbf";
-          return (
-            <div key={h.id} style={{ background:"#0f0c1a", border:"1px solid #2a1f3d", borderLeft:`3px solid ${sc}`, borderRadius:10, padding:14 }}>
-              {editingId === h.id ? (
-                <>
-                  <input value={editForm.title} onChange={e => setEditForm(f => ({...f, title:e.target.value}))} style={{...inputStyle, marginBottom:8}}/>
-                  <textarea value={editForm.description||""} onChange={e => setEditForm(f => ({...f, description:e.target.value}))} rows={4} style={{...inputStyle, resize:"vertical", marginBottom:8}}/>
-                  <select value={editForm.status||defaultStatus} onChange={e => setEditForm(f => ({...f, status:e.target.value}))} style={{...selStyle, marginBottom:12}}>
-                    {statuses.map(s => <option key={s.name}>{s.name}</option>)}
-                  </select>
-                  <div style={{ display:"flex", gap:8 }}>
-                    <button onClick={saveEdit} disabled={!editForm.title.trim()} style={{...btnPrimary, flex:1, fontSize:12}}>💾 Save</button>
-                    <button onClick={() => setEditingId(null)} style={{...btnSecondary, flex:1, fontSize:12}}>Cancel</button>
-                  </div>
-                </>
-              ) : confirmDeleteId === h.id ? (
-                <div style={{ display:"flex", alignItems:"center", gap:10, background:"#1a0d0d", borderRadius:8, padding:"8px 12px" }}>
-                  <span style={{ flex:1, fontSize:12, color:"#c8b89a" }}>Delete <strong>"{h.title.slice(0,40)}{h.title.length>40?"…":""}"</strong>?</span>
-                  <button onClick={() => { removeHook(h.id); setConfirmDeleteId(null); }} style={{ background:"#6b1a1a", color:"#e8d5b7", border:"none", borderRadius:6, padding:"4px 12px", cursor:"pointer", fontWeight:700, fontSize:12 }}>Delete</button>
-                  <button onClick={() => setConfirmDeleteId(null)} style={{ background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 12px", cursor:"pointer", fontSize:12 }}>Cancel</button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom: h.description ? 8 : 0 }}>
-                    <span style={{ fontSize:10, color:sc, background:sc+"22", border:`1px solid ${sc}44`, borderRadius:8, padding:"2px 8px", flexShrink:0, marginTop:2 }}>{h.status}</span>
-                    <span style={{ fontSize:14, color:"#e8d5b7", fontWeight:700, fontFamily:"Georgia,serif", flex:1 }}>{h.title}</span>
-                    <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-                      {onPinHook && (() => { const isPinned = pinnedHookIds?.has(`${char.id}::${h.id}`); return (
-                        <button onClick={() => onPinHook(char.id, h.id)} style={{...btnSecondary, fontSize:12, padding:"4px 10px", display:"flex", alignItems:"center", gap:4, color: isPinned ? "#c8a96e" : "#9a7fa0", borderColor: isPinned ? "#c8a96e66" : undefined}}>
-                          📌 <span>{isPinned ? "Pinned" : "Pin to reminders"}</span>
-                        </button>
-                      ); })()}
-                      <button onClick={() => { setEditingId(h.id); setEditForm({title:h.title, description:h.description||"", status:h.status||defaultStatus}); }} style={{...btnSecondary, fontSize:12, padding:"4px 10px"}}>✏️</button>
-                      <button onClick={() => setConfirmDeleteId(h.id)} style={{...btnSecondary, fontSize:12, padding:"4px 10px", color:"#c06060", borderColor:"#6b1a1a"}}>🗑️</button>
-                    </div>
-                  </div>
-                  {h.description && <div style={{ fontSize:13, color:"#b09080", lineHeight:1.6, whiteSpace:"pre-wrap", paddingLeft:2 }}>{h.description}</div>}
-                </>
-              )}
-            </div>
-          );
-        })}
+        {hooks.map(h => (
+          <HookCard
+            key={h.id}
+            hook={h}
+            onUpdate={updateHook}
+            onRemove={() => removeHook(h.id)}
+            onPin={onPinHook ? () => onPinHook(char.id, h.id) : null}
+            isPinned={!!pinnedHookIds?.has(`${char.id}::${h.id}`)}
+            statuses={statuses}
+            colorMap={colorMap}
+            chars={chars}
+            factions={factions}
+            locations={locations}
+            stories={stories}
+            artifacts={artifacts}
+          />
+        ))}
       </div>
     </div>
   );
@@ -1052,7 +999,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
           }
         </div>
       )}
-      {subTab==="hooks" && <CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds}/>}
+      {subTab==="hooks" && <CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds} chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}/>}
       {subTab==="files" && onUpdateChar && <FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
     </div>
   );

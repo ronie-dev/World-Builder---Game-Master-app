@@ -60,8 +60,8 @@ function LocationsTabContent({
   selectedLocation, selectedLocationId,
   updPg,
   onNewLocation, onSaveLocation, onDeleteLocation,
-  onOpenChar, onOpenStory, onOpenFaction, onShowOnMap,
-  isEditing, onSetEditing, locationTypes,
+  onOpenChar, onOpenStory, onOpenFaction, onSaveFaction, onShowOnMap,
+  locationTypes,
 }) {
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
@@ -108,7 +108,7 @@ function LocationsTabContent({
                               onEdit={l=>updPg({ selectedLocationId: l.id })}
                               onDelete={onDeleteLocation}
                               isSelected={selectedLocation?.id===l.id}
-                              onSelect={l=>updPg({ selectedLocationId: selectedLocationId===l.id?null:l.id, locationEditing: false })}/>
+                              onSelect={l=>updPg({ selectedLocationId: selectedLocationId===l.id?null:l.id })}/>
                           ))}
                         </div>
                       )}
@@ -125,8 +125,9 @@ function LocationsTabContent({
                 onSave={onSaveLocation}
                 onDelete={id=>{ onDeleteLocation(id); updPg({ selectedLocationId: null }); }}
                 onOpenChar={onOpenChar} onOpenStory={onOpenStory} onOpenFaction={onOpenFaction}
+                onSaveFaction={onSaveFaction}
                 onShowOnMap={(mapData?.maps||[]).some(m=>(m.pins||[]).some(p=>p.locationId===selectedLocation.id)) ? ()=>onShowOnMap(selectedLocation) : undefined}
-                isEditing={isEditing} onSetEditing={onSetEditing} locationTypes={locationTypes}/>
+                locationTypes={locationTypes}/>
             : <EmptyState icon="📍" title="Select a location to view details"/>
           }
         </div>

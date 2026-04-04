@@ -10,21 +10,24 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 
 ---
 
-## What's New in v0.6.0
+## What's New in v0.6.1
 
-### UX — Safety & Feedback
-- **Delete confirmations** added throughout — removing a character, story, faction, location, map pin, or any linked entity now requires an inline ✓/✕ confirm; no data can be lost with a single misclick
-- **Summary strips** in Faction, Location, and Story detail headers — at-a-glance counts for members, residents, linked factions, stories, and active hooks
-- **Empty states** across all list sections with helpful copy instead of blank space
-- **Button hover transitions** applied consistently to all primary, secondary, and icon buttons
+### Seamless Inline Editing
+- **Items, Locations, and Factions** no longer have an Edit button — every text field is always editable in place
+- Ghost-style inputs: border appears only when a field is focused; subtle background highlight on hover
 
-### Command Palette
-- Type filter tabs added (All / Characters / Stories / Factions / Locations / Items / Lore)
-- Result limit raised to 60; footer always visible with keyboard hint and result count
+### Hooks — Redesigned
+- Hooks now use a **row-based layout**: each row has a text field on the left and a stacked column of entity cards on the right
+- Two add buttons per hook: **＋ row** (new line) and **＋ entity** (add a linked entity to a row)
+- Entity cards show actual portraits; text areas auto-expand while typing
+- Drag-and-drop rows and entities independently via ⠿ handles
 
-### Bug Fixes
-- Fixed transparent faction detail panel header — scrolled content was bleeding through the gradient background
-- Fixed `GalleryPicker` hover bug; picker now also closes on Escape
+### Notes — Unified Hook List
+- GM hooks and pinned story/character hooks are now a **single drag-reorderable list**
+- Hooks linked to a story sync bidirectionally between Notes and the story's Hooks tab
+
+### Locations — Faction Linking
+- Link and unlink factions directly from the Location detail panel via an inline "＋ Link faction" picker
 
 ---
 
@@ -66,7 +69,7 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 ### Locations
 - Grouped by type with fold/unfold
 - Search and type filter
-- Detail panel showing linked characters, factions, and stories
+- Detail panel showing linked characters, factions, and stories — link/unlink factions directly from the panel
 - "Show on Map" button — navigate directly to a pinned location on the World Map
 
 ### World Map

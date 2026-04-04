@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.6.1 — Seamless Editing, Hook Overhaul & Location Factions
+
+### Seamless Inline Editing
+- **Items & Artifacts** — removed the Edit button; name, value, description, and lore are now always-editable ghost fields; border appears only on focus, subtle background highlight on hover
+- **Locations** — removed the Edit button; name, region, description, and type are now always-editable inline; same focus-only border behavior
+- **Factions description** — hover highlight added to the description area (background + outline); textarea border is now hidden by default and appears only when focused
+
+### Hooks — Full Row-Based Rewrite
+- Hook data model redesigned: each hook is now a list of **rows** (`[{text, entities[]}]`) instead of a flat block array — one row = one text field + a column of entity cards beside it
+- Two add buttons: **＋ row** at the bottom adds a new text row; **＋ entity** button on the right of each row adds an entity card to that row
+- Entity cards stack vertically beside their row's text, giving the text field maximum width
+- Entity cards show the actual portrait/image of the linked entity (not just an icon)
+- Text blocks **auto-expand** while typing — no more scrolling inside a tiny textarea
+- Drag-and-drop reordering of rows via ⠿ handle; entities within a row are also draggable
+- Migration from all old formats (`blocks[]`, `description + linkedEntities`) handled automatically
+
+### Notes — Unified Hook List
+- **GM hooks and pinned story/character hooks now live in a single unified list** — no more separate "Pinned from Stories & Characters" section
+- All hooks (GM-created and pinned) are drag-reorderable together via ⠿ handles
+- Hooks linked to a story now **sync bidirectionally** — edits made in the Notes panel are reflected in the story's Hooks tab and vice versa
+- `hookListOrder` is self-healing: preserves stored order and appends any newly created hooks at the end
+
+### Locations — Faction Linking
+- Factions section in the Location detail panel is now **always visible** with a "＋ Link faction" button
+- Link any faction to the current location directly from the panel (sets the faction's home location)
+- Unlink with the × button beside each faction badge
+- Inline search picker with live filtering
+
 ## v0.6.0 — Codebase Cleanup & Structural Refactor
 
 ### Architecture
