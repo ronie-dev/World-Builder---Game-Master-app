@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.7.0 — Dual-Panel Navigation, Section Split & UX Polish
+
+### Dual-Panel System — Navigation History
+- **Back button (←)** in the panel header — navigate backwards through your in-panel history (open a character → jump to their item → press ← to return)
+- `charSubTab` and `storySubTab` are now included in navigation snapshots so the exact sub-tab is restored on back
+- Map picker dialog now pushes to panel history — back button works after selecting a map from the multi-map picker
+
+### Sidebar — Redesign & Double-Click
+- Sidebar icons are now **33% larger** (22 px icons, 50×44 px hit area, 44×36 px tool buttons) for easier clicking
+- **Double-click any sidebar icon** to open that section instantly in the right panel
+- Dragging a section icon onto a panel that already shows that section is now a no-op (no accidental resets)
+
+### Notes — Split into Three Sections
+- **📝 Notes** — scratch pad only (no more clutter)
+- **📖 Sessions** — session log with events and story timeline links
+- **📌 Hooks** — GM hooks + all pinned story/character hooks in one drag-reorderable list
+
+### Floating Search Bar — All Tabs
+- All five major sections (Characters, Stories, Factions, Locations, Items) now have a **floating search bar** that overlays the detail panel — the detail fills the full height and the search sits on top
+- Filter drawer opens on click or as you type; closes automatically on outside click
+- Locations drawer groups results by location type; Items drawer has rarity filter pills
+
+### Cross-Panel Links — Ctrl+Click & Middle-Click
+- **Every navigation link** in the app now supports **Ctrl+click** and **middle-click (MMB)** to open the target in the other panel
+- Covers: faction names in character detail, artifact rows in character and story detail, character name chips in story groups, faction/location tags in story detail, character chips in Timeline events, session log story links, hook card linked-story badge, map pin clicks and location label text
+- `onOpenArtifact` now supports `{ newTab: true }` throughout
+
+### Image Lightbox — Scoped to Panel
+- Zoomed portrait/image lightbox is now **contained within its panel** instead of covering the full screen — the other panel remains fully visible and interactive
+
+### File Drag — No False Overlay
+- Dragging an image file from outside the app onto an image drop zone no longer triggers the "Drop to replace this screen" panel overlay — only internal section/entity drags show that overlay
+
 ## v0.6.1 — Seamless Editing, Hook Overhaul & Location Factions
 
 ### Seamless Inline Editing

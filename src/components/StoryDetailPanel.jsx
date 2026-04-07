@@ -14,7 +14,7 @@ function HooksTab({ story, onUpdateStory, hookStatuses, onPinHook, pinnedHookIds
   const defaultStatus = statuses[0]?.name || "Potential";
 
   const hooks = story.hooks || [];
-  const addHook = () => onUpdateStory({ ...story, hooks: [...hooks, { id: uid(), title:"New hook", description:"", status: defaultStatus, linkedEntities:[] }] });
+  const addHook = () => onUpdateStory({ ...story, hooks: [{ id: uid(), title:"New hook", description:"", status: defaultStatus, linkedEntities:[] }, ...hooks] });
   const updateHook = updated => onUpdateStory({ ...story, hooks: hooks.map(h => h.id === updated.id ? updated : h) });
   const removeHook = id => onUpdateStory({ ...story, hooks: hooks.filter(h => h.id !== id) });
 
@@ -88,7 +88,10 @@ function LootTab({ story, onUpdateStory, artifacts, chars, onOpenChar, onOpenArt
               const rc = rarityColors[a.rarity] || "#9a9a9a";
               const holder = a.holderId ? (chars||[]).find(c => c.id === a.holderId) : null;
               return (
-                <div key={a.id} onClick={() => onOpenArtifact?.(a)} style={{ background:"#0f0c1a", border:`1px solid ${rc}33`, borderLeft:`3px solid ${rc}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center", cursor: onOpenArtifact ? "pointer" : "default", transition:"border-color .15s" }}
+                <div key={a.id}
+                  onClick={onOpenArtifact ? e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenArtifact(a,{newTab:true});}else{onOpenArtifact(a);} } : undefined}
+                  onAuxClick={onOpenArtifact ? e=>{ if(e.button===1){e.preventDefault();onOpenArtifact(a,{newTab:true});} } : undefined}
+                  style={{ background:"#0f0c1a", border:`1px solid ${rc}33`, borderLeft:`3px solid ${rc}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center", cursor: onOpenArtifact ? "pointer" : "default", transition:"border-color .15s" }}
                   onMouseEnter={e => { if(onOpenArtifact) e.currentTarget.style.borderColor = rc+"88"; }}
                   onMouseLeave={e => { if(onOpenArtifact) e.currentTarget.style.borderColor = rc+"33"; }}>
                   {a.image && <img src={a.image} alt="" style={{ width:40, height:40, borderRadius:6, objectFit:"cover", flexShrink:0 }}/>}
@@ -500,12 +503,12 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                         {groupChars.map(c => (
                           <div key={c.id}
                             draggable
-                            onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; setDragCharId(c.id); }}
+                            onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("application/x-wbentity", JSON.stringify({ entityType:"character", id:c.id })); setDragCharId(c.id); }}
                             onDragEnd={()=>{ setDragCharId(null); setDragOverGroupId(null); }}
                             style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 8px", cursor:"grab", opacity: dragCharId===c.id ? 0.4 : 1, transition:"opacity .1s", maxWidth:220, minWidth:0 }}>
                             <Avatar src={c.image} name={c.name} size={26}/>
                             <div style={{ flex:1, minWidth:0 }}>
-                              <div onClick={()=>onOpenChar?.(c)} style={{ fontSize:12, color:"#c8a96e", fontWeight:600, cursor:"pointer", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                              <div onClick={e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar?.(c,{newTab:true});}else{onOpenChar?.(c);} }} onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenChar?.(c,{newTab:true});}}} style={{ fontSize:12, color:"#c8a96e", fontWeight:600, cursor:"pointer", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
                                 onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>
                                 {c.type==="player"?"🎲":c.type==="main"?"⭐":"👤"} {c.name}
                               </div>
@@ -568,7 +571,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                       {linkedChars.filter(c=>!charGroupAssignments[c.id]).map(c=>(
                         <div key={c.id}
                           draggable
-                          onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; setDragCharId(c.id); }}
+                          onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("application/x-wbentity", JSON.stringify({ entityType:"character", id:c.id })); setDragCharId(c.id); }}
                           onDragEnd={()=>{ setDragCharId(null); setDragOverGroupId(null); }}
                           style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 8px", cursor:"grab", opacity: dragCharId===c.id ? 0.4 : 1, transition:"opacity .1s", maxWidth:220, minWidth:0 }}>
                           <Avatar src={c.image} name={c.name} size={26}/>
@@ -666,7 +669,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                               <button onClick={()=>setConfirmRemoveFacId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1 }}>✕</button>
                             </>
                           : <>
-                              <span onClick={()=>onOpenFaction?.(f)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
+                              <span onClick={e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenFaction?.(f,{newTab:true});}else{onOpenFaction?.(f);} }} onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenFaction?.(f,{newTab:true});}}} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
                                 onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>{f.name}</span>
                               <button onClick={()=>setConfirmRemoveFacId(fid)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
                                 onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
@@ -715,7 +718,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                               <button onClick={()=>setConfirmRemoveLocId(null)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1 }}>✕</button>
                             </>
                           : <>
-                              <span onClick={()=>onOpenLocation?.(l)} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
+                              <span onClick={e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenLocation?.(l,{newTab:true});}else{onOpenLocation?.(l);} }} onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenLocation?.(l,{newTab:true});}}} style={{ fontSize:12, color:"#c8a96e", cursor:"pointer" }}
                                 onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"} onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>{l.region?`${l.name} (${l.region})`:l.name}</span>
                               <button onClick={()=>setConfirmRemoveLocId(lid)} style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
                                 onMouseEnter={e=>e.currentTarget.style.color="#c06060"} onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>

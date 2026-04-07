@@ -317,6 +317,27 @@ function ArtifactDetailPanel({ artifact, chars, stories, onSave, onDelete, onClo
   );
 }
 
+// ── Compact artifact row ───────────────────────────────────────────────────────
+function ArtifactRow({ artifact, chars, rarityColors, isSelected, onSelect }) {
+  const rarityColor = rarityColors[artifact.rarity] || "#9a9a9a";
+  const holder = artifact.holderId ? chars.find(c => c.id === artifact.holderId) : null;
+  return (
+    <div onClick={() => onSelect(artifact)}
+      style={{ display:"flex", alignItems:"center", gap:8, padding:"5px 10px", borderRadius:6, cursor:"pointer", background:isSelected?"#1e1535":"transparent", borderLeft:`2px solid ${isSelected?rarityColor:"transparent"}`, transition:"background .1s" }}
+      onMouseEnter={e=>{ if(!isSelected) e.currentTarget.style.background="#13101e"; }}
+      onMouseLeave={e=>{ if(!isSelected) e.currentTarget.style.background="transparent"; }}>
+      {artifact.image
+        ? <img src={artifact.image} alt="" style={{ width:22, height:22, borderRadius:4, objectFit:"cover", flexShrink:0 }}/>
+        : <span style={{ fontSize:14, flexShrink:0 }}>⚗️</span>}
+      <span style={{ fontSize:13, color:"#e8d5b7", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+        {artifact.name || <span style={{ color:"#5a4a7a", fontStyle:"italic" }}>Unnamed</span>}
+      </span>
+      <span style={{ fontSize:10, color:rarityColor, background:rarityColor+"22", borderRadius:4, padding:"1px 5px", flexShrink:0 }}>{artifact.rarity}</span>
+      {holder && <Avatar src={holder.image} name={holder.name} size={16}/>}
+    </div>
+  );
+}
+
 // ── Main Tab ───────────────────────────────────────────────────────────────────
 function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar, onOpenStory, onAskConfirm, onCloseConfirm, navArtifactId, rarities }) {
   const rList = rarities || DEFAULT_RARITIES;
@@ -324,6 +345,15 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
   const [rarityFilter, setRarityFilter] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const overlayRef = useRef(null);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const handler = e => { if (overlayRef.current && !overlayRef.current.contains(e.target)) setDrawerOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [drawerOpen]);
 
   const effectiveSelectedId = navArtifactId && artifacts.some(a => a.id === navArtifactId) ? navArtifactId : selectedId;
   const selected = artifacts.find(a => a.id === effectiveSelectedId) || null;
@@ -332,6 +362,7 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
     const newId = uid();
     onUpdateArtifacts([{ ...defaultArtifact, id: newId, _isNew: true }, ...artifacts]);
     setSelectedId(newId);
+    setDrawerOpen(false);
   };
 
   const handleSave = updated => {
@@ -359,102 +390,87 @@ function ArtifactsTab({ artifacts, onUpdateArtifacts, chars, stories, onOpenChar
     (!rarityFilter || a.rarity === rarityFilter)
   );
 
+  const hasFilter = !!(search || rarityFilter);
+
   return (
-    <div style={{ display:"flex", flexDirection:"column", flex:1, overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18, flexShrink:0 }}>
-        <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:0, fontSize:26 }}>Items & Artifacts</h1>
-        <button onClick={handleNew} style={btnPrimary}>+ New Item</button>
-      </div>
+    <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, position:"relative" }}>
 
-      <div style={{ flex:1, display:"flex", gap:24, overflow:"hidden", minHeight:0, paddingBottom:28 }}>
-        {/* Left — list */}
-        <div style={{ flex:1, minWidth:0, overflowY:"auto", paddingRight:12 }}>
-          <div style={{ marginBottom:12 }}>
-            <div style={{ position:"relative", marginBottom:8 }}>
-              <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:13 }}>🔍</span>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items…"
-                style={{ ...inputStyle, paddingLeft:30, fontSize:13 }}/>
-            </div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              <div onClick={() => setRarityFilter("")}
-                style={{ padding:"3px 10px", borderRadius:14, cursor:"pointer", fontSize:11, border:`1px solid ${!rarityFilter?"#7c5cbf":"#3a2a5a"}`, background:!rarityFilter?"#7c5cbf33":"transparent", color:!rarityFilter?"#c8b8e8":"#7a7a9a" }}>
-                All
-              </div>
-              {rList.map(r => {
-                const color = rarityColors[r.name];
-                const sel = rarityFilter === r.name;
-                return (
-                  <div key={r.name} onClick={() => setRarityFilter(sel ? "" : r.name)}
-                    style={{ padding:"3px 10px", borderRadius:14, cursor:"pointer", fontSize:11, border:`1px solid ${sel?color:"#3a2a5a"}`, background:sel?color+"33":"transparent", color:sel?color:"#7a7a9a" }}>
-                    {r.name}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {filtered.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"60px 0", color:"#5a4a7a", border:"1px dashed #2a1f3d", borderRadius:12 }}>
-              <div style={{ fontSize:40, marginBottom:12 }}>⚗️</div>
-              <div style={{ fontFamily:"Georgia,serif", fontSize:15 }}>{artifacts.length === 0 ? "No items yet." : "No matches"}</div>
-              {artifacts.length === 0 && <div style={{ fontSize:13, marginTop:6 }}>Click "+ New Item" to add one.</div>}
-            </div>
-          ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {filtered.map(a => {
-                const rarityColor = rarityColors[a.rarity] || "#9a9a9a";
-                const holder = a.holderId ? chars.find(c => c.id === a.holderId) : null;
-                const isSel = effectiveSelectedId === a.id;
-                return (
-                  <div key={a.id} onClick={() => setSelectedId(prev => prev === a.id ? null : a.id)}
-                    style={{ background:isSel?"#1e1535":"#1a1228", border:`1px solid ${isSel?rarityColor:rarityColor+"44"}`, borderLeft:`3px solid ${rarityColor}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center", cursor:"pointer", transition:"border-color .15s, background .15s", userSelect:"none" }}
-                    onMouseEnter={e => { if (!isSel) { e.currentTarget.style.borderColor=rarityColor+"99"; } }}
-                    onMouseLeave={e => { if (!isSel) { e.currentTarget.style.borderColor=rarityColor+"44"; } }}>
-                    {a.image
-                      ? <img src={a.image} alt="" style={{ width:40, height:40, borderRadius:6, objectFit:"cover", flexShrink:0, border:`1px solid ${rarityColor}44` }}/>
-                      : <div style={{ width:40, height:40, borderRadius:6, background:"#1e1630", border:`1px solid #2a1f3d`, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>⚗️</div>}
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
-                        <span style={{ fontFamily:"Georgia,serif", fontWeight:700, fontSize:14, color:"#e8d5b7" }}>{a.name || <span style={{ color:"#5a4a7a", fontStyle:"italic" }}>Unnamed item</span>}</span>
-                        <span style={{ fontSize:10, color:rarityColor, background:rarityColor+"22", borderRadius:6, padding:"1px 6px" }}>{a.rarity}</span>
-                        {a.value && <span style={{ fontSize:11, color:"#c8a96e" }}>🪙 {a.value}</span>}
-                      </div>
-                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        {holder
-                          ? <div style={{ display:"flex", alignItems:"center", gap:4 }}><Avatar src={holder.image} name={holder.name} size={14}/><span style={{ fontSize:11, color:"#9a7fa0" }}>{holder.name}</span></div>
-                          : <span style={{ fontSize:11, color:"#4a3a5a" }}>Unowned</span>}
-                        {a.description && <span style={{ fontSize:11, color:"#6a5a7a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.description}</span>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Right — detail panel */}
-        <div style={{ flex:1, minWidth:0, overflowY:"auto" }}>
-          {selected ? (
-            <ArtifactDetailPanel
-              artifact={selected}
-              chars={chars}
-              stories={stories}
+      {/* ── Detail: fills full height ── */}
+      <div style={{ position:"absolute", inset:0, overflowY:"auto", paddingTop:44 }}>
+        {selected
+          ? <ArtifactDetailPanel
+              artifact={selected} chars={chars} stories={stories}
               onSave={handleSave}
               onDelete={() => deleteArtifact(selected.id)}
               onClose={() => setSelectedId(null)}
               onCancelNew={handleCancelNew}
-              onOpenChar={onOpenChar}
-              onOpenStory={onOpenStory}
-              rarities={rarities}
-            />
-          ) : (
-            <div style={{ background:"#13101f", border:"1px dashed #2a1f3d", borderRadius:12, padding:"48px 24px", textAlign:"center", color:"#3a2a5a" }}>
-              <div style={{ fontSize:40, marginBottom:12 }}>⚗️</div>
-              <div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>Select an item to view details</div>
+              onOpenChar={onOpenChar} onOpenStory={onOpenStory}
+              rarities={rarities}/>
+          : <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", color:"#3a2a5a", textAlign:"center" }}>
+              <div style={{ fontSize:44, opacity:.18, marginBottom:14 }}>⚗️</div>
+              <div style={{ fontSize:14, fontFamily:"Georgia,serif", color:"#3a2a5a" }}>Select an item to view details</div>
+              <div style={{ fontSize:12, color:"#2a1f3d", marginTop:6 }}>Search above or open the list</div>
             </div>
+        }
+      </div>
+
+      {/* ── Search overlay ── */}
+      <div ref={overlayRef} style={{ position:"absolute", top:0, left:0, right:0, zIndex:10, background:"#0f0c1a", borderBottom: drawerOpen ? "1px solid #2a1f3d" : "none", boxShadow: drawerOpen ? "0 8px 32px #00000099" : "0 2px 12px #00000066" }}>
+        {/* Top bar */}
+        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px" }}>
+          <div style={{ flex:1, position:"relative" }}>
+            <span style={{ position:"absolute", left:9, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:13, pointerEvents:"none" }}>🔍</span>
+            <input
+              placeholder="Search items…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); if (!drawerOpen) setDrawerOpen(true); }}
+              onFocus={() => setDrawerOpen(true)}
+              style={{ ...inputStyle, paddingLeft:30, fontSize:13, width:"100%", boxSizing:"border-box" }}/>
+          </div>
+          <button onClick={() => setDrawerOpen(o => !o)}
+            style={{ display:"flex", alignItems:"center", gap:4, padding:"5px 10px", borderRadius:6, border:`1px solid ${drawerOpen||hasFilter?"#7c5cbf":"#3a2a5a"}`, background:drawerOpen||hasFilter?"#2a1a4a":"transparent", color:drawerOpen||hasFilter?"#e8d5b7":"#6a5a8a", fontSize:12, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+            Filters{hasFilter ? " · 1" : ""} <span style={{ fontSize:9 }}>{drawerOpen?"▲":"▼"}</span>
+          </button>
+          {hasFilter && (
+            <button onClick={() => { setSearch(""); setRarityFilter(""); }}
+              style={{ padding:"4px 8px", borderRadius:6, border:"1px solid #6b1a1a", background:"transparent", color:"#c06060", fontSize:12, cursor:"pointer", flexShrink:0 }}>✕</button>
           )}
+          <button onClick={handleNew} style={{ ...btnPrimary, fontSize:12, padding:"4px 10px", flexShrink:0 }}>+ New</button>
         </div>
+
+        {/* Drawer */}
+        {drawerOpen && (
+          <div style={{ borderTop:"1px solid #1e1630", maxHeight:320, display:"flex", flexDirection:"column" }}>
+            {/* Rarity filter pills */}
+            <div style={{ padding:"8px 12px", display:"flex", flexWrap:"wrap", gap:6, flexShrink:0, borderBottom:"1px solid #1e1630" }}>
+              <button onClick={() => setRarityFilter("")}
+                style={{ padding:"3px 10px", borderRadius:20, border:`1px solid ${!rarityFilter?"#7c5cbf":"#3a2a5a"}`, background:!rarityFilter?"#2a1a4a":"transparent", color:!rarityFilter?"#e8d5b7":"#6a5a8a", fontSize:12, cursor:"pointer" }}>
+                All
+              </button>
+              {rList.map(r => {
+                const color = rarityColors[r.name];
+                const sel = rarityFilter === r.name;
+                return (
+                  <button key={r.name} onClick={() => setRarityFilter(sel ? "" : r.name)}
+                    style={{ padding:"3px 10px", borderRadius:20, border:`1px solid ${sel?color:"#3a2a5a"}`, background:sel?color+"33":"transparent", color:sel?color:"#6a5a8a", fontSize:12, cursor:"pointer" }}>
+                    {r.name}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Compact list */}
+            <div style={{ overflowY:"auto", flex:1 }}>
+              {filtered.length === 0
+                ? <div style={{ padding:"12px 16px", fontSize:12, color:"#5a4a7a" }}>No items match.</div>
+                : filtered.map(a => (
+                    <ArtifactRow key={a.id} artifact={a} chars={chars} rarityColors={rarityColors}
+                      isSelected={effectiveSelectedId===a.id}
+                      onSelect={a => { setSelectedId(a.id); setDrawerOpen(false); }}/>
+                  ))
+              }
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -10,24 +10,33 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 
 ---
 
-## What's New in v0.6.1
+## What's New in v0.7.0
 
-### Seamless Inline Editing
-- **Items, Locations, and Factions** no longer have an Edit button — every text field is always editable in place
-- Ghost-style inputs: border appears only when a field is focused; subtle background highlight on hover
+### Back Button — Panel Navigation History
+- Every panel now tracks navigation history — press **←** in the panel header to go back to your previous view
+- Works across all section changes: character → item → ← back to character, story → faction → ← back to story, etc.
 
-### Hooks — Redesigned
-- Hooks now use a **row-based layout**: each row has a text field on the left and a stacked column of entity cards on the right
-- Two add buttons per hook: **＋ row** (new line) and **＋ entity** (add a linked entity to a row)
-- Entity cards show actual portraits; text areas auto-expand while typing
-- Drag-and-drop rows and entities independently via ⠿ handles
+### Notes Split into Three Sections
+- **📝 Notes** — scratch pad only
+- **📖 Sessions** — session log with timeline linking
+- **📌 Hooks** — all GM hooks and pinned story/character hooks in a unified drag-reorderable list
 
-### Notes — Unified Hook List
-- GM hooks and pinned story/character hooks are now a **single drag-reorderable list**
-- Hooks linked to a story sync bidirectionally between Notes and the story's Hooks tab
+### Floating Search Bar — All Tabs
+- Characters, Stories, Factions, Locations, and Items all use a **floating search bar** that hovers above the detail panel — the detail fills the full height and the search closes automatically when you click away
 
-### Locations — Faction Linking
-- Link and unlink factions directly from the Location detail panel via an inline "＋ Link faction" picker
+### Open in Other Panel — Everywhere
+- **Ctrl+click** or **middle-click** any link (character name, story badge, faction tag, location, artifact, map pin…) to open it in the other panel — works consistently across every part of the app
+
+### Sidebar Improvements
+- Icons are **33% larger** for easier clicking
+- **Double-click** any sidebar section icon to open it directly in the right panel
+- Dragging a section onto a panel that already shows it does nothing (no accidental resets)
+
+### Lightbox Scoped to Panel
+- Zoomed portrait/image is now contained within its panel — the other panel stays fully visible
+
+### File Drop Fix
+- Dragging an image from outside the app no longer triggers the "Drop to replace this screen" overlay
 
 ---
 
@@ -98,10 +107,10 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 - Type filter tabs (All / Characters / Stories / Factions / Locations / Items / Lore)
 - Keyboard navigation with Enter to open
 
-### Notes
-- Scratch pad with auto-expanding textarea
-- **Pinned Reminders** — merge story hooks, character hooks, and manual notes in one drag-reorderable list
-- Session log — add sessions with dates and events; link events directly to story timeline entries
+### Notes, Sessions & Hooks
+- **📝 Notes** — scratch pad with auto-expanding textarea
+- **📖 Sessions** — add sessions with dates and events; link events directly to story timeline entries
+- **📌 Hooks** — GM hooks and all pinned story/character hooks in one drag-reorderable list; hooks linked to a story sync bidirectionally
 
 ### Relationships
 - Visual relationship web between characters and stories

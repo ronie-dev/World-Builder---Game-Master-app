@@ -220,7 +220,7 @@ function StoryLinkPicker({ stories, onSelect, onClose }) {
 }
 
 // ── Main HookCard ─────────────────────────────────────────────────────────────
-export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, statuses, colorMap, chars, factions, locations, stories, artifacts, onLinkStory, onUnlinkStory, sourceName, onOpenSource }) {
+export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, statuses, colorMap, chars, factions, locations, stories, artifacts, onLinkStory, onUnlinkStory, onOpenLinkedStory, sourceName, onOpenSource }) {
   const [title, setTitle]               = useState(hook.title);
   const [prevTitle, setPrevTitle]       = useState(hook.title);
   const [confirmDelete, setConfirmDelete]       = useState(false);
@@ -314,6 +314,38 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
             {sourceName} ↗
           </span>
         )}
+        {/* Story link — Notes GM hooks */}
+        {(onLinkStory||onUnlinkStory) && (
+          hook.linkedStoryId ? (
+            <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0 }}>
+              <span
+                onClick={e=>{ const s=(stories||[]).find(x=>x.id===hook.linkedStoryId); if(s&&onOpenLinkedStory){ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenLinkedStory(s,{newTab:true});}else{onOpenLinkedStory(s);} } }}
+                onAuxClick={e=>{ if(e.button===1){ const s=(stories||[]).find(x=>x.id===hook.linkedStoryId); if(s&&onOpenLinkedStory){e.preventDefault();onOpenLinkedStory(s,{newTab:true});} } }}
+                style={{ fontSize:11, color:"#c8a96e", fontWeight:700, whiteSpace:"nowrap", cursor: onOpenLinkedStory?"pointer":"default" }}
+                onMouseEnter={e=>{ if(onOpenLinkedStory) e.currentTarget.style.textDecoration="underline"; }}
+                onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}>
+                {(stories||[]).find(s=>s.id===hook.linkedStoryId)?.name || "Story"} ↗
+              </span>
+              <button onClick={onUnlinkStory}
+                style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:11, padding:"0 2px", lineHeight:1 }}
+                onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
+                onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>× unlink</button>
+            </div>
+          ) : (
+            <div style={{ position:"relative", flexShrink:0 }}>
+              <button onClick={()=>setStoryPicker(v=>!v)}
+                style={{ fontSize:11, color:"#5a4a7a", background:"none", border:"none", cursor:"pointer", padding:0, display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap" }}
+                onMouseEnter={e=>e.currentTarget.style.color="#9a7fa0"}
+                onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>🔗 Link story</button>
+              {storyPicker && (
+                <StoryLinkPicker stories={stories}
+                  onSelect={id=>{ onLinkStory(id); setStoryPicker(false); }}
+                  onClose={()=>setStoryPicker(false)}
+                />
+              )}
+            </div>
+          )
+        )}
         {onPin && (
           <button onClick={onPin}
             style={{ display:"flex", alignItems:"center", gap:4, background:"none", border:`1px solid ${isPinned?"#c8a96e44":"transparent"}`, borderRadius:6, cursor:"pointer", fontSize:12, padding:"2px 8px", color:isPinned?"#c8a96e":"#5a4a7a", flexShrink:0 }}
@@ -336,44 +368,30 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
       </div>
 
       {/* Rows */}
-      <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:8 }}>
-        {rows.map(row => {
+      <div style={{ display:"flex", flexDirection:"column", marginBottom:8 }}>
+        {rows.map((row, rowIdx) => {
           const hasContent = row.text.trim() || row.entities.length > 0;
           return (
             <div key={row.id}
               style={{ display:"flex", alignItems:"flex-start", gap:6,
                 opacity: draggingRowId===row.id ? 0.35 : 1,
                 outline: dragOverRowId===row.id ? "2px solid #5a3a8a" : "none",
-                borderRadius:8, padding:"2px 0" }}
+                borderRadius:4, padding:"6px 0",
+                borderTop: rowIdx > 0 ? "1px solid #1e1630" : "none" }}
               onMouseEnter={()=>setHoveredRowId(row.id)}
               onMouseLeave={()=>setHoveredRowId(null)}
               onDragOver={e=>{ e.preventDefault(); if(dragRowRef.current) setDragOverRowId(row.id); }}
               onDragLeave={()=>setDragOverRowId(null)}
               onDrop={e=>{ e.preventDefault(); if(dragRowRef.current) { reorderRows(dragRowRef.current, row.id); setDragOverRowId(null); } }}
             >
-              {/* Left gutter: row drag handle + remove */}
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, flexShrink:0, paddingTop:6 }}>
+              {/* Left gutter: drag handle only */}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, alignSelf:"stretch" }}>
                 <span draggable
                   onDragStart={()=>{ dragRowRef.current=row.id; setDraggingRowId(row.id); }}
                   onDragEnd={()=>{ dragRowRef.current=null; setDraggingRowId(null); setDragOverRowId(null); }}
-                  style={{ fontSize:14, color:"#3a2a5a", cursor:"grab", userSelect:"none", lineHeight:1 }}
+                  style={{ fontSize:21, color:"#3a2a5a", cursor:"grab", userSelect:"none", lineHeight:1 }}
                   onMouseEnter={e=>e.currentTarget.style.color="#9a7fa0"}
                   onMouseLeave={e=>e.currentTarget.style.color="#3a2a5a"}>⠿</span>
-                {hoveredRowId===row.id && rows.length > 1 && (
-                  confirmDeleteRowId===row.id ? (
-                    <span style={{ fontSize:10, display:"flex", gap:3 }}>
-                      <span onClick={()=>{ removeRow(row.id); setConfirmDeleteRowId(null); }}
-                        style={{ color:"#c06060", cursor:"pointer" }} title="Confirm">✓</span>
-                      <span onClick={()=>setConfirmDeleteRowId(null)}
-                        style={{ color:"#5a4a7a", cursor:"pointer" }}>✕</span>
-                    </span>
-                  ) : (
-                    <span onClick={()=>hasContent ? setConfirmDeleteRowId(row.id) : removeRow(row.id)}
-                      style={{ fontSize:12, color:"#3a2a5a", cursor:"pointer", lineHeight:1 }}
-                      onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
-                      onMouseLeave={e=>e.currentTarget.style.color="#3a2a5a"}>×</span>
-                  )
-                )}
               </div>
 
               {/* Text */}
@@ -417,6 +435,24 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
                   chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts}
                   existingEntities={allLinkedEntities}
                 />
+                {/* Remove row — shown on hover, only when multiple rows exist */}
+                {hoveredRowId===row.id && rows.length > 1 && (
+                  confirmDeleteRowId===row.id ? (
+                    <div style={{ display:"flex", gap:4, alignItems:"center", marginTop:2 }}>
+                      <button onClick={()=>{ removeRow(row.id); setConfirmDeleteRowId(null); }}
+                        style={{ background:"#6b1a1a", color:"#e8d5b7", border:"none", borderRadius:5, padding:"2px 10px", cursor:"pointer", fontSize:11, fontWeight:700 }}>Delete row</button>
+                      <button onClick={()=>setConfirmDeleteRowId(null)}
+                        style={{ background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:5, padding:"2px 8px", cursor:"pointer", fontSize:11 }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>hasContent ? setConfirmDeleteRowId(row.id) : removeRow(row.id)}
+                      style={{ background:"none", border:"1px solid transparent", borderRadius:5, color:"#4a3a6a", cursor:"pointer", fontSize:11, padding:"2px 8px", marginTop:2, alignSelf:"flex-end" }}
+                      onMouseEnter={e=>{ e.currentTarget.style.color="#c06060"; e.currentTarget.style.borderColor="#6b1a1a"; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.color="#4a3a6a"; e.currentTarget.style.borderColor="transparent"; }}>
+                      × Remove row
+                    </button>
+                  )
+                )}
               </div>
             </div>
           );
@@ -431,36 +467,6 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
         ＋ row
       </button>
 
-      {/* Story link (Notes tab only) */}
-      {(onLinkStory||onUnlinkStory) && (
-        <div style={{ marginTop:8, paddingTop:8, borderTop:"1px solid #1e1630" }}>
-          {hook.linkedStoryId ? (
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <span style={{ fontSize:11, color:"#7c5cbf" }}>📜</span>
-              <span style={{ fontSize:11, color:"#c8a96e", flex:1 }}>
-                {(stories||[]).find(s=>s.id===hook.linkedStoryId)?.name || "Unknown story"}
-              </span>
-              <button onClick={onUnlinkStory}
-                style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:11, padding:"0 4px" }}
-                onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
-                onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>× unlink</button>
-            </div>
-          ) : (
-            <div style={{ position:"relative" }}>
-              <button onClick={()=>setStoryPicker(v=>!v)}
-                style={{ fontSize:11, color:"#5a4a7a", background:"none", border:"none", cursor:"pointer", padding:0, display:"flex", alignItems:"center", gap:4 }}
-                onMouseEnter={e=>e.currentTarget.style.color="#9a7fa0"}
-                onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>🔗 Link to story</button>
-              {storyPicker && (
-                <StoryLinkPicker stories={stories}
-                  onSelect={id=>{ onLinkStory(id); setStoryPicker(false); }}
-                  onClose={()=>setStoryPicker(false)}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

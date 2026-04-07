@@ -33,6 +33,8 @@ import LocationsTabContent from "./components/tabs/LocationsTabContent.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import RelationshipWeb from "./components/RelationshipWeb.jsx";
 import NotesTabContent from "./components/tabs/NotesTabContent.jsx";
+import SessionLogTabContent from "./components/tabs/SessionLogTabContent.jsx";
+import HooksTabContent from "./components/tabs/HooksTabContent.jsx";
 import GalleryTabContent from "./components/tabs/GalleryTabContent.jsx";
 
 // ── Storage (IndexedDB) ───────────────────────────────────────────────────────
@@ -400,9 +402,21 @@ const TABS = [
   {id:"timeline",label:"⏳ Timeline",icon:"⏳"},{id:"locations",label:"📍 Locations",icon:"📍"},
   {id:"map",label:"🗺️ Map",icon:"🗺️"},{id:"lore",label:"🏛️ Lore",icon:"🏛️"},
   {id:"relations",label:"🕸️ Relations",icon:"🕸️"},
-  {id:"notes",label:"📝 Notes",icon:"📝"},{id:"gallery",label:"🖼️ Gallery",icon:"🖼️"},
+  {id:"notes",label:"📝 Notes",icon:"📝"},{id:"sessions",label:"📖 Sessions",icon:"📖"},{id:"hooks",label:"📌 Hooks",icon:"📌"},{id:"gallery",label:"🖼️ Gallery",icon:"🖼️"},
 ];
 const ALL_TABS = [...TABS, {id:"settings",label:"⚙️ Settings",icon:"⚙️"}];
+
+// ── Panel default state (outside component — uses imported defaultFilters) ────
+const NAV_KEYS = ["section","selectedCharId","selectedStoryId","selectedFactionId","selectedLocationId","itemNavId","mapNavTarget","storyHighlightEventId","charSubTab","storySubTab"];
+const PANEL_DEFAULT = {
+  selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null,
+  charSubTab: "details", storySubTab: "details",
+  charEditing: false, storyEditing: false, factionEditing: false,
+  itemNavId: null, storyHighlightEventId: null, mapNavTarget: null,
+  query: "", storyQuery: "", storyStatusFilter: "", locationQuery: "", locationTypeFilter: "", factionQuery: "",
+  collapsedLocTypes: {}, filters: defaultFilters, mainCollapsed: false, sideCollapsed: false,
+  history: [],
+};
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -446,48 +460,46 @@ export default function App() {
   }, [chars, artifacts, stories, loreEvents]);
   const [galleryEntries, setGalleryEntries, galleryEntriesRef] = useStateWithRef([]);
   const [locationModal, setLocationModal] = useState(null);
-  const DEFAULT_PAGE = {
-    tab: "characters",
-    selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null,
-    charSubTab: "details", storySubTab: "details",
-    charEditing: false, storyEditing: false, factionEditing: false,
-    prevTab: null, itemNavId: null, storyHighlightEventId: null, mapNavTarget: null,
-    query: "", storyQuery: "", storyStatusFilter: "", locationQuery: "", locationTypeFilter: "",
-    collapsedLocTypes: {}, filters: defaultFilters, mainCollapsed: false, sideCollapsed: false,
-  };
-  const [pages, setPages] = useState(() => [{ id: "tab-1", ...DEFAULT_PAGE }]);
-  const [activePageId, setActivePageId] = useState("tab-1");
-  const pg = pages.find(p => p.id === activePageId) || pages[0];
-  // Stable updaters — only change when activePageId changes, not on every render
-  const updPg = useCallback(
-    updates => setPages(ps => ps.map(p => p.id === activePageId ? {...p, ...updates} : p)),
-    [activePageId]
-  );
-  // Functional form — receives current page and returns partial update (no stale closure over tab)
-  const updPgFn = useCallback(
-    fn => setPages(ps => ps.map(p => p.id === activePageId ? {...p, ...fn(p)} : p)),
-    [activePageId]
-  );
+  // ── Panel state (2-slot drag-and-drop system) ────────────────────────────────
+  const [panels, setPanels, panelsRef] = useStateWithRef([{ ...PANEL_DEFAULT, section: "characters" }, null]);
 
-  // Derived from active page — keeps existing render code working
-  // tab is still needed for sidebar nav highlighting and the keydown handler
-  const tab = pg.tab;
-
-  const addPage = useCallback((initialStateOrTab = {}) => {
-    const newId = uid();
-    const extra = typeof initialStateOrTab === "string"
-      ? { tab: initialStateOrTab }
-      : initialStateOrTab;
-    setPages(prev => [...prev, { id: newId, ...DEFAULT_PAGE, ...extra }]);
-    setActivePageId(newId);
-  }, []); // eslint-disable-line
-  const closePage = useCallback(pageId => {
-    setPages(prev => {
-      if (prev.length === 1) return prev;
-      const idx = prev.findIndex(p => p.id === pageId);
-      const next = prev.filter(p => p.id !== pageId);
-      setActivePageId(aid => aid === pageId ? next[Math.min(idx, next.length-1)].id : aid);
-      return next;
+  const updatePanel = useCallback((idx, updates) => {
+    setPanels(prev => prev.map((p, i) => i === idx && p ? { ...p, ...updates } : p));
+  }, []);
+  const updatePanelFn = useCallback((idx, fn) => {
+    setPanels(prev => prev.map((p, i) => i === idx && p ? { ...p, ...fn(p) } : p));
+  }, []);
+  const openInPanel = useCallback((idx, section) => {
+    setPanels(prev => { const np = [...prev]; np[idx] = { ...PANEL_DEFAULT, section }; return np; });
+  }, []);
+  const closePanel = useCallback(idx => {
+    setPanels(prev => prev.map((p, i) => i === idx ? null : p));
+  }, []);
+  // Navigate within a panel — pushes current nav state to history
+  const navPanel = useCallback((idx, updates) => {
+    setPanels(prev => prev.map((p, i) => {
+      if (i !== idx || !p) return p;
+      const snap = Object.fromEntries(NAV_KEYS.map(k => [k, p[k]]));
+      return { ...p, ...updates, history: [...(p.history||[]), snap] };
+    }));
+  }, []);
+  const goBack = useCallback(idx => {
+    setPanels(prev => prev.map((p, i) => {
+      if (i !== idx || !p || !(p.history||[]).length) return p;
+      const history = [...(p.history||[])];
+      const prev2 = history.pop();
+      return { ...p, ...prev2, history };
+    }));
+  }, []);
+  // Navigate to a section: reuse existing panel showing it, else first empty slot, else panel 0
+  const navToSection = useCallback((section, update = {}) => {
+    setPanels(prev => {
+      const np = [...prev];
+      let idx = np.findIndex(p => p?.section === section);
+      if (idx < 0) idx = np.findIndex(p => !p);
+      if (idx < 0) idx = 0;
+      np[idx] = np[idx] ? { ...np[idx], section, ...update } : { ...PANEL_DEFAULT, section, ...update };
+      return np;
     });
   }, []);
 
@@ -496,19 +508,15 @@ export default function App() {
   const [confirm, setConfirm] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
+  const [dragOverPanel, setDragOverPanel] = useState(null); // { idx, section, isEntity? }
+  const [draggingSection, setDraggingSection] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [campaignManagerOpen, setCampaignManagerOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("wb_sidebar") === "1");
-  useEffect(() => { localStorage.setItem("wb_sidebar", sidebarCollapsed ? "1" : "0"); }, [sidebarCollapsed]);
 
   const askConfirm = useCallback((message, onConfirm) => setConfirm({message, onConfirm}), []);
   const closeConfirm = useCallback(() => setConfirm(null), []);
-
-  const navigateTo = useCallback(newTab => {
-    updPgFn(p => ({ tab: newTab, prevTab: p.tab, ...(newTab !== "map" ? { mapNavTarget: null } : {}) }));
-  }, [updPgFn]);
 
   // ── Undo history ────────────────────────────────────────────────────────────
   const historyRef = useRef([]);
@@ -569,42 +577,18 @@ export default function App() {
 
   useEffect(() => {
     const handler = e => {
-      const inInput = e.target.closest('input, textarea, select, [contenteditable]');
-
-      // Escape — close in priority order
+      // Escape — close modals in priority order
       if (e.key === 'Escape') {
         if (cmdPaletteOpen){ setCmdPaletteOpen(false); return; }
         if (searchOpen)    { setSearchOpen(false); return; }
         if (locationModal) { setLocationModal(null); return; }
         if (confirm)       { closeConfirm(); return; }
-        updPg({ selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null });
         return;
-      }
-
-      // N — new item on current tab (skip if typing or a modal is open)
-      if (e.key === 'n' && !inInput && !locationModal && !searchOpen) {
-        e.preventDefault();
-        if (tab === 'characters') {
-          const newId = uid();
-          pushHistory();
-          setChars(prev => [...prev, { ...defaultChar, type: "main", id: newId, _isNew: true }]);
-          updPg({ tab: "characters", selectedCharId: newId, charEditing: true });
-        } else if (tab === 'stories') {
-          const newId = uid();
-          pushHistory();
-          setStories(prev => [...prev, { ...defaultStory, id: newId, _isNew: true }]);
-          updPg({ tab: "stories", selectedStoryId: newId, storyEditing: true });
-        } else if (tab === 'factions') {
-          const newId = uid();
-          pushHistory();
-          setFactions(prev => [...prev, { ...defaultFaction, id: newId, _isNew: true }]);
-          updPg({ tab: "factions", selectedFactionId: newId, factionEditing: true });
-        } else if (tab === 'locations') setLocationModal({...defaultLocation});
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [tab, searchOpen, locationModal, confirm, closeConfirm]); // eslint-disable-line
+  }, [searchOpen, locationModal, confirm, closeConfirm, cmdPaletteOpen]);
 
   // ── Load campaign blob into state ────────────────────────────────────────────
   const applyBlob = useCallback(blob => {
@@ -642,14 +626,19 @@ export default function App() {
       setMapData(md);
     }
     const nav = blob.nav||{};
-    setPages(prev => prev.map(p => p.id === activePageId ? {
-      ...p,
-      tab: nav.tab||"characters", prevTab: nav.prevTab||null,
-      selectedCharId: nav.selectedCharId||null,
-      selectedStoryId: nav.selectedStoryId||null,
-      selectedFactionId: nav.selectedFactionId||null,
-      selectedLocationId: nav.selectedLocationId||null,
-    } : p));
+    if (nav.panels) {
+      setPanels(nav.panels.map(p => p ? { ...PANEL_DEFAULT, ...p } : null));
+    } else {
+      // Legacy: migrate old tab-based nav to single panel
+      setPanels([{
+        ...PANEL_DEFAULT,
+        section: nav.tab||"characters",
+        selectedCharId: nav.selectedCharId||null,
+        selectedStoryId: nav.selectedStoryId||null,
+        selectedFactionId: nav.selectedFactionId||null,
+        selectedLocationId: nav.selectedLocationId||null,
+      }, null]);
+    }
   }, []); // eslint-disable-line
 
   // ── Initial load ─────────────────────────────────────────────────────────────
@@ -711,12 +700,12 @@ export default function App() {
     saveTimerRef.current = setTimeout(async () => {
       const blob = {
         chars, stories, races, factions, locations, notes, loreEvents, deities, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, locationTypes, rarities, deityAlignments, eras, mapData, galleryEntries,
-        nav: { tab: pg.tab, prevTab: pg.prevTab, selectedCharId: pg.selectedCharId||null, selectedStoryId: pg.selectedStoryId||null, selectedFactionId: pg.selectedFactionId||null, selectedLocationId: pg.selectedLocationId||null },
+        nav: { panels: panels.map(p => p ? { section: p.section, selectedCharId: p.selectedCharId||null, selectedStoryId: p.selectedStoryId||null, selectedFactionId: p.selectedFactionId||null, selectedLocationId: p.selectedLocationId||null } : null) },
       };
       try { await store.set(`fwb_campaign_${activeCampaignId}`, JSON.stringify(blob)); } catch { /* ignore save failures */ }
     }, 500);
     return () => clearTimeout(saveTimerRef.current);
-  }, [chars, stories, races, factions, locations, notes, loreEvents, deities, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, locationTypes, rarities, deityAlignments, eras, mapData, galleryEntries, pg, loaded, activeCampaignId]);
+  }, [chars, stories, races, factions, locations, notes, loreEvents, deities, relations, artifacts, charStatuses, relationshipTypes, storyStatuses, hookStatuses, locationTypes, rarities, deityAlignments, eras, mapData, galleryEntries, panels, loaded, activeCampaignId]);
 
   const updateChar = useCallback(updated => { pushHistory(); setChars(prev => prev.map(c => c.id===updated.id ? updated : c)); }, [pushHistory]);
 
@@ -752,7 +741,7 @@ export default function App() {
     askConfirm(`Delete "${c?.name}"?`, () => {
       pushHistory();
       setChars(prev=>prev.filter(x=>x.id!==id).map(c=>({...c,relationships:(c.relationships||[]).filter(r=>r.charId!==id)})));
-      updPgFn(p => p.selectedCharId===id ? { selectedCharId: null } : {});
+      setPanels(prev=>prev.map(p=>p?.selectedCharId===id ? {...p,selectedCharId:null} : p));
       setStories(prev=>prev.map(s=>({
         ...s,
         characterIds:(s.characterIds||[]).filter(x=>x!==id),
@@ -764,7 +753,7 @@ export default function App() {
       closeConfirm();
       showToast("Character deleted", "error");
     });
-  }, [chars, updPgFn, askConfirm, closeConfirm, pushHistory, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chars, askConfirm, closeConfirm, pushHistory, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const deleteStory = useCallback(id => {
@@ -772,7 +761,7 @@ export default function App() {
     askConfirm(`Delete story "${s?.name}"?`, () => {
       pushHistory();
       setStories(prev=>prev.filter(x=>x.id!==id));
-      updPgFn(p => p.selectedStoryId===id ? { selectedStoryId: null } : {});
+      setPanels(prev=>prev.map(p=>p?.selectedStoryId===id ? {...p,selectedStoryId:null} : p));
       setArtifacts(prev=>prev.map(a=>({...a, storyIds:(a.storyIds||[]).filter(sid=>sid!==id)})));
       setNotes(prev=>({
         ...prev,
@@ -785,7 +774,7 @@ export default function App() {
       closeConfirm();
       showToast("Story deleted", "error");
     });
-  }, [stories, updPgFn, askConfirm, closeConfirm, pushHistory, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stories, askConfirm, closeConfirm, pushHistory, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateStory = useCallback(updated => { pushHistory(); setStories(prev=>prev.map(s=>s.id===updated.id?updated:s)); }, [pushHistory]);
 
@@ -810,14 +799,14 @@ export default function App() {
     askConfirm(`Delete faction "${f?.name}"?`, () => {
       pushHistory();
       setFactions(prev=>prev.filter(x=>x.id!==id));
-      updPgFn(p => p.selectedFactionId===id ? { selectedFactionId: null } : {});
+      setPanels(prev=>prev.map(p=>p?.selectedFactionId===id ? {...p,selectedFactionId:null} : p));
       setChars(prev=>prev.map(c=>({...c,factions:(c.factions||[]).filter(e=>e.factionId!==id)})));
       setStories(prev=>prev.map(s=>({...s,factionIds:(s.factionIds||[]).filter(fid=>fid!==id)})));
       setDeities(prev=>prev.map(d=>({...d,factionIds:(d.factionIds||[]).filter(fid=>fid!==id)})));
       closeConfirm();
       showToast("Faction deleted", "error");
     });
-  }, [factions, updPgFn, askConfirm, closeConfirm, pushHistory, showToast]);
+  }, [factions, askConfirm, closeConfirm, pushHistory, showToast]);
 
   const saveLocation = useCallback(form => {
     pushHistory();
@@ -831,7 +820,7 @@ export default function App() {
     askConfirm(`Delete location "${l?.name}"?`, () => {
       pushHistory();
       setLocations(prev=>prev.filter(x=>x.id!==id));
-      updPgFn(p => p.selectedLocationId===id ? { selectedLocationId: null } : {});
+      setPanels(prev=>prev.map(p=>p?.selectedLocationId===id ? {...p,selectedLocationId:null} : p));
       setChars(prev=>prev.map(c=>c.locationId===id?{...c,locationId:""}:c));
       setStories(prev=>prev.map(s=>({...s,locationIds:(s.locationIds||[]).filter(lid=>lid!==id)})));
       setFactions(prev=>prev.map(f=>f.locationId===id?{...f,locationId:""}:f));
@@ -846,98 +835,88 @@ export default function App() {
       closeConfirm();
       showToast("Location deleted", "error");
     });
-  }, [locations, updPgFn, askConfirm, closeConfirm, pushHistory, showToast]);
+  }, [locations, askConfirm, closeConfirm, pushHistory, showToast]);
 
+  // ── Global navigation (used by search/command palette — target best panel) ────
   const handleOpenStory = useCallback((story, highlightEventId = null, opts = {}) => {
-    if (opts.newTab) { addPage({ tab: "stories", selectedStoryId: story.id, storyHighlightEventId: highlightEventId||null, ...(opts.storySubTab ? { storySubTab: opts.storySubTab } : {}) }); return; }
-    updPgFn(p => ({ tab: "stories", prevTab: p.tab, mapNavTarget: null, selectedStoryId: story.id, storyHighlightEventId: highlightEventId||null, ...(opts.storySubTab ? { storySubTab: opts.storySubTab } : {}) }));
-  }, [updPgFn, addPage]);
+    navToSection("stories", { selectedStoryId: story.id, storyHighlightEventId: highlightEventId||null, ...(opts.storySubTab ? { storySubTab: opts.storySubTab } : {}) });
+  }, [navToSection]);
 
   const handleOpenChar = useCallback((char, opts = {}) => {
-    if (opts.newTab) { addPage({ tab: "characters", selectedCharId: char.id, ...(opts.charSubTab ? { charSubTab: opts.charSubTab } : {}) }); return; }
-    updPgFn(p => ({ tab: "characters", prevTab: p.tab, mapNavTarget: null, selectedCharId: char.id, ...(opts.charSubTab ? { charSubTab: opts.charSubTab } : {}) }));
-  }, [updPgFn, addPage]);
+    navToSection("characters", { selectedCharId: char.id, ...(opts.charSubTab ? { charSubTab: opts.charSubTab } : {}) });
+  }, [navToSection]);
 
-  const handleShowOnMap = useCallback(location => {
+  const handleShowOnMap = useCallback((location, panelIdx = 0) => {
     const allMaps = mapData?.maps || [];
     const matches = allMaps.flatMap(m => (m.pins||[]).filter(pin => pin.locationId === location.id).map(pin => ({ map: m, pin })));
     if (matches.length === 0) return;
     if (matches.length === 1) {
-      updPgFn(p => ({ tab: "map", prevTab: p.tab, mapNavTarget: { mapId: matches[0].map.id, pin: matches[0].pin } }));
+      navToSection("map", { mapNavTarget: { mapId: matches[0].map.id, pin: matches[0].pin } });
     } else {
-      setMapPicker({ location, maps: matches });
+      setMapPicker({ location, maps: matches, panelIdx });
     }
-  }, [mapData, updPgFn]);
+  }, [mapData, navToSection]);
 
-  const handleOpenFaction = useCallback((faction, opts = {}) => {
-    if (opts.newTab) { addPage({ tab: "factions", selectedFactionId: faction.id }); return; }
-    updPgFn(p => ({ tab: "factions", prevTab: p.tab, mapNavTarget: null, selectedFactionId: faction.id }));
-  }, [updPgFn, addPage]);
+  const handleOpenFaction = useCallback((faction) => {
+    navToSection("factions", { selectedFactionId: faction.id });
+  }, [navToSection]);
 
-  const handleOpenLocation = useCallback((location, opts = {}) => {
-    if (opts.newTab) { addPage({ tab: "locations", selectedLocationId: location.id }); return; }
-    updPgFn(p => ({ tab: "locations", prevTab: p.tab, mapNavTarget: null, selectedLocationId: location.id }));
-  }, [updPgFn, addPage]);
+  const handleOpenLocation = useCallback((location) => {
+    navToSection("locations", { selectedLocationId: location.id });
+  }, [navToSection]);
 
   const handleOpenLoreEvent = useCallback(() => {
-    updPgFn(p => ({ tab: "lore", prevTab: p.tab, mapNavTarget: null }));
-  }, [updPgFn]);
+    navToSection("lore");
+  }, [navToSection]);
 
   const handleSearchSelectArtifact = useCallback(() => {
-    updPgFn(p => ({ tab: "items", prevTab: p.tab, mapNavTarget: null, selectedCharId: null, selectedStoryId: null, selectedFactionId: null, selectedLocationId: null }));
-  }, [updPgFn]);
+    navToSection("items");
+  }, [navToSection]);
 
   const handleImport = useCallback((c, s, r, f, loc, art, lore, rels, nts, md) => {
     setChars(c||[]); setStories(s||[]); setRaces(r||DEFAULT_RACES); setFactions(f||[]); setLocations(loc||[]);
     setArtifacts(art||[]); setLoreEvents(lore||[]); setRelations(rels||{nodes:[],edges:[]}); setNotes(nts||{scratch:"",sessions:[],pins:[],playerPins:{}});
     setMapData(md && md.maps ? md : {maps:[]});
-    setPages([{ id: "tab-1", ...DEFAULT_PAGE }]); setActivePageId("tab-1");
+    setPanels([{ ...PANEL_DEFAULT, section: "characters" }, null]);
     showToast("World imported", "info");
   }, [showToast]);
 
-  // Stable modal openers for tab components
+  // Stable modal openers — open in the panel showing the right section, else panel 0
   function openCharModal(type) {
     const newId = uid();
-    const newChar = {...defaultChar, type, id: newId, _isNew: true};
     pushHistory();
-    setChars(prev => [...prev, newChar]);
-    updPgFn(p => ({...p, tab: "characters", selectedCharId: newId, charEditing: true}));
+    setChars(prev => [...prev, {...defaultChar, type, id: newId, _isNew: true}]);
+    navToSection("characters", { selectedCharId: newId, charEditing: true });
   }
-
   function cancelNewChar(id) {
     setChars(prev => prev.filter(c => c.id !== id));
-    updPgFn(p => ({...p, selectedCharId: null, charEditing: false}));
+    setPanels(prev => prev.map(p => p?.section === "characters" ? { ...p, selectedCharId: null, charEditing: false } : p));
   }
   function openStoryModal() {
     const newId = uid();
-    const newStory = {...defaultStory, id: newId, _isNew: true};
     pushHistory();
-    setStories(prev => [...prev, newStory]);
-    updPgFn(p => ({...p, tab: "stories", selectedStoryId: newId, storyEditing: true}));
+    setStories(prev => [...prev, {...defaultStory, id: newId, _isNew: true}]);
+    navToSection("stories", { selectedStoryId: newId, storyEditing: true });
   }
-
   function cancelNewStory(id) {
     setStories(prev => prev.filter(s => s.id !== id));
-    updPgFn(p => ({...p, selectedStoryId: null, storyEditing: false}));
+    setPanels(prev => prev.map(p => p?.section === "stories" ? { ...p, selectedStoryId: null, storyEditing: false } : p));
   }
   function openFactionModal() {
     const newId = uid();
-    const newFaction = {...defaultFaction, id: newId, _isNew: true};
     pushHistory();
-    setFactions(prev => [...prev, newFaction]);
-    updPgFn(p => ({...p, tab: "factions", selectedFactionId: newId, factionEditing: true}));
+    setFactions(prev => [...prev, {...defaultFaction, id: newId, _isNew: true}]);
+    navToSection("factions", { selectedFactionId: newId, factionEditing: true });
   }
-
   function cancelNewFaction(id) {
     setFactions(prev => prev.filter(f => f.id !== id));
-    updPgFn(p => ({...p, selectedFactionId: null, factionEditing: false}));
+    setPanels(prev => prev.map(p => p?.section === "factions" ? { ...p, selectedFactionId: null, factionEditing: false } : p));
   }
   const openLocationModal = useCallback(() => setLocationModal({...defaultLocation}), []);
 
-  // Navigate to items tab from story detail (uses updPgFn to avoid stale tab closure)
   const handleOpenArtifactInStory = useCallback(a => {
-    updPgFn(p => ({ itemNavId: a.id, tab: "items", prevTab: p.tab, mapNavTarget: null }));
-  }, [updPgFn]);
+    navToSection("items", { itemNavId: a.id });
+  }, [navToSection]);
 
   // Wrapped setters — push history before any child-initiated mutation
   const updateArtifacts = useCallback(u => { pushHistory(); setArtifacts(u); }, [pushHistory]);
@@ -959,7 +938,7 @@ export default function App() {
     setLocationTypes(DEFAULT_LOCATION_TYPES); setRarities(DEFAULT_RARITIES); setDeityAlignments(DEFAULT_DEITY_ALIGNMENTS);
     setEras([]);
     setMapData({maps:[]});
-    setPages([{ id: "tab-1", ...DEFAULT_PAGE }]); setActivePageId("tab-1");
+    setPanels([{ ...PANEL_DEFAULT, section: "characters" }, null]);
     historyRef.current = []; setHistoryLen(0);
   }, []);
 
@@ -973,7 +952,7 @@ export default function App() {
       locationTypes: locationTypesRef.current, rarities: raritiesRef.current, deityAlignments: deityAlignmentsRef.current,
       eras: erasRef.current,
       mapData: mapDataRef.current, galleryEntries: galleryEntriesRef.current,
-      nav: { tab: pg.tab, prevTab: pg.prevTab, selectedCharId: pg.selectedCharId||null, selectedStoryId: pg.selectedStoryId||null, selectedFactionId: pg.selectedFactionId||null, selectedLocationId: pg.selectedLocationId||null },
+      nav: { panels: panelsRef.current.map(p => p ? { section: p.section, selectedCharId: p.selectedCharId||null, selectedStoryId: p.selectedStoryId||null, selectedFactionId: p.selectedFactionId||null, selectedLocationId: p.selectedLocationId||null } : null) },
     };
     try { await store.set(`fwb_campaign_${campaignId}`, JSON.stringify(blob)); } catch { /* ignore save failures */ }
   }
@@ -1091,252 +1070,289 @@ export default function App() {
       onSelect={switchCampaign} onCreate={createCampaign} onRename={renameCampaign} onDelete={deleteCampaign}/>
   );
 
+  // ── Per-panel section renderer ────────────────────────────────────────────────
+  function renderPanelSection(panel, panelIdx) {
+    const upd = updates => updatePanel(panelIdx, updates);
+    const storyStatusOrder = Object.fromEntries(storyStatuses.map((s,i)=>[s.name,i]));
+
+    // Per-panel navigation — links within a panel stay in that panel;
+    // Ctrl+click / middle-click (opts.newTab) opens in the OTHER panel
+    const openInOther = (section, update) => {
+      const otherIdx = panelIdx === 0 ? 1 : 0;
+      setPanels(prev => { const np=[...prev]; np[otherIdx]={...(np[otherIdx]||PANEL_DEFAULT),section,...update}; return np; });
+    };
+    const nav = updates => navPanel(panelIdx, updates);
+    const onOpenChar    = (c,opts={}) => opts.newTab ? openInOther("characters",{selectedCharId:c.id}) : nav({section:"characters",selectedCharId:c.id,...(opts.charSubTab?{charSubTab:opts.charSubTab}:{})});
+    const onOpenStory   = (s,hlId=null,opts={}) => opts.newTab ? openInOther("stories",{selectedStoryId:s.id,storyHighlightEventId:hlId||null}) : nav({section:"stories",selectedStoryId:s.id,storyHighlightEventId:hlId||null,...(opts.storySubTab?{storySubTab:opts.storySubTab}:{})});
+    const onOpenFaction = (f,opts={}) => opts.newTab ? openInOther("factions",{selectedFactionId:f.id}) : nav({section:"factions",selectedFactionId:f.id});
+    const onOpenLocation= (l,opts={}) => opts.newTab ? openInOther("locations",{selectedLocationId:l.id}) : nav({section:"locations",selectedLocationId:l.id});
+    const onOpenArtifact= (a,opts={}) => opts.newTab ? openInOther("items",{itemNavId:a.id}) : nav({section:"items",itemNavId:a.id});
+    const onShowOnMap   = (location) => {
+      const allMaps = mapData?.maps||[];
+      const matches = allMaps.flatMap(m=>(m.pins||[]).filter(pin=>pin.locationId===location.id).map(pin=>({map:m,pin})));
+      if (!matches.length) return;
+      if (matches.length===1) nav({section:"map",mapNavTarget:{mapId:matches[0].map.id,pin:matches[0].pin}});
+      else setMapPicker({location,maps:matches,panelIdx});
+    };
+
+    // Per-panel char filtering
+    const pq = panel.query.toLowerCase();
+    const filterChars = list => list.filter(c => {
+      const raceLabel = getRaceLabel(races,c.raceId,c.subraceId).toLowerCase();
+      const locationLabel = locations.find(l=>l.id===c.locationId)?.name?.toLowerCase()||"";
+      const factionLabels = factions.filter(f=>(c.factions||[]).some(e=>e.factionId===f.id)).map(f=>f.name.toLowerCase()).join(" ");
+      const matchQ = !pq||["name","shortDescription","description","secret","origin","class"].some(k=>c[k]?.toLowerCase().includes(pq))||raceLabel.includes(pq)||locationLabel.includes(pq)||factionLabels.includes(pq);
+      const pf = panel.filters;
+      const matchF = (!pf.raceId||c.raceId===pf.raceId)&&(!pf.locationId||c.locationId===pf.locationId)&&(!pf.status||c.status===pf.status)&&(!pf.factionId||(c.factions||[]).some(e=>e.factionId===pf.factionId));
+      return matchQ && matchF;
+    });
+    const pAllPlayers = chars.filter(c=>c.type==="player");
+    const pMain = filterChars(chars.filter(c=>c.type==="main")).sort((a,b)=>a.name.localeCompare(b.name));
+    const pSide = filterChars(chars.filter(c=>c.type==="side")).sort((a,b)=>a.name.localeCompare(b.name));
+
+    // Per-panel story filtering
+    const sq = panel.storyQuery.toLowerCase();
+    const pMainStory = stories.find(s=>s.isMain)||null;
+    const pPlayerStories = stories.filter(s=>s.playerId&&!s.isMain);
+    const pOtherStories = stories.filter(s=>!s.isMain&&!s.playerId).filter(s=>{
+      const matchText=!sq||s.name.toLowerCase().includes(sq)||(s.summary||"").toLowerCase().includes(sq);
+      return matchText&&(!panel.storyStatusFilter||s.status===panel.storyStatusFilter);
+    }).sort((a,b)=>(storyStatusOrder[a.status]??9999)-(storyStatusOrder[b.status]??9999));
+
+    const pSelectedChar     = chars.find(c=>c.id===panel.selectedCharId)||null;
+    const pSelectedStory    = stories.find(s=>s.id===panel.selectedStoryId)||null;
+    const pSelectedFaction  = factions.find(f=>f.id===panel.selectedFactionId)||null;
+    const pSelectedLocation = locations.find(l=>l.id===panel.selectedLocationId)||null;
+
+    const section = panel.section;
+    if (section==="characters") return <CharactersTabContent
+      chars={chars} races={races} factions={factions} locations={locations}
+      stories={stories} loreEvents={loreEvents} artifacts={artifacts}
+      charStatuses={charStatuses} storyStatuses={storyStatuses}
+      hookStatuses={hookStatuses} relationshipTypes={relationshipTypes}
+      allPlayers={pAllPlayers} main={pMain} side={pSide}
+      query={panel.query} filters={panel.filters}
+      selectedChar={pSelectedChar} selectedCharId={panel.selectedCharId}
+      charSubTab={panel.charSubTab} mainCollapsed={panel.mainCollapsed} sideCollapsed={panel.sideCollapsed}
+      updPg={upd}
+      onNewChar={openCharModal} onDeleteChar={deleteChar} onCancelNew={cancelNewChar}
+      onOpenStory={onOpenStory} onOpenFaction={onOpenFaction} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact}
+      onSaveChar={saveChar} onSaveFaction={saveFaction} onUpdateArtifacts={updateArtifacts}
+      onPinCharHook={handlePinCharHook} pinnedCharHookIds={pinnedCharHookIds} rarities={rarities}/>;
+    if (section==="stories") return <StoriesTabContent
+      stories={stories} chars={chars} factions={factions} locations={locations} artifacts={artifacts}
+      storyStatuses={storyStatuses} hookStatuses={hookStatuses}
+      storyQuery={panel.storyQuery} storyStatusFilter={panel.storyStatusFilter}
+      selectedStory={pSelectedStory} selectedStoryId={panel.selectedStoryId}
+      storySubTab={panel.storySubTab} storyHighlightEventId={panel.storyHighlightEventId}
+      mainStory={pMainStory} playerStories={pPlayerStories} otherStories={pOtherStories}
+      currentTimelineDate={currentTimelineDate}
+      updPg={upd}
+      onNewStory={openStoryModal} onDeleteStory={deleteStory} onCancelNew={cancelNewStory}
+      onSetMain={setMainStory} onSetPlayerStory={setPlayerStory} onUpdateStory={updateStory}
+      onOpenChar={onOpenChar} onOpenFaction={onOpenFaction} onOpenLocation={onOpenLocation}
+      onOpenArtifact={onOpenArtifact} onUpdateArtifacts={updateArtifacts}
+      onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}
+      onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds} rarities={rarities}/>;
+    const fq = (panel.factionQuery||"").toLowerCase();
+    const pFilteredFactions = factions.filter(f => !fq || f.name.toLowerCase().includes(fq) || (f.description||"").toLowerCase().includes(fq));
+    if (section==="factions") return <FactionsTabContent
+      factions={factions} filteredFactions={pFilteredFactions} chars={chars} locations={locations}
+      factionQuery={panel.factionQuery||""}
+      selectedFaction={pSelectedFaction} selectedFactionId={panel.selectedFactionId}
+      updPg={upd}
+      onNewFaction={openFactionModal} onCancelNew={cancelNewFaction}
+      onSaveFaction={saveFaction} onDeleteFaction={deleteFaction} onOpenChar={onOpenChar} onSaveChar={saveChar}/>;
+    if (section==="timeline") return <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}>
+      <div style={{ padding:"28px 32px 12px", flexShrink:0 }}>
+        <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 6px", fontSize:26 }}>Timeline</h1>
+        <p style={{ color:"#5a4a7a", fontSize:13, margin:0 }}>All events across every story, grouped by date.</p>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", padding:"0 32px 28px", minHeight:0 }}>
+        <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} eras={eras} onOpenStory={onOpenStory} onOpenChar={onOpenChar}/>
+      </div>
+    </div>;
+    if (section==="locations") return <LocationsTabContent
+      locations={locations} chars={chars} factions={factions} stories={stories} mapData={mapData}
+      locationQuery={panel.locationQuery} locationTypeFilter={panel.locationTypeFilter} collapsedLocTypes={panel.collapsedLocTypes}
+      selectedLocation={pSelectedLocation} selectedLocationId={panel.selectedLocationId}
+      updPg={upd}
+      onNewLocation={openLocationModal}
+      onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
+      onOpenChar={onOpenChar} onOpenStory={onOpenStory} onOpenFaction={onOpenFaction}
+      onSaveFaction={saveFaction}
+      onShowOnMap={onShowOnMap}
+      locationTypes={locationTypes}/>;
+    if (section==="items") return <ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={onOpenChar} onOpenStory={onOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={panel.itemNavId} rarities={rarities}/>;
+    if (section==="map") return <MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={onOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={panel.mapNavTarget} locationTypes={locationTypes}/>;
+    if (section==="lore") return <div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={onOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} deities={deities} onUpdateDeities={updateDeities} factions={factions} locations={locations} deityAlignments={deityAlignments} eras={eras}/></div>;
+    if (section==="relations") return <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}><RelationshipWeb chars={chars} stories={stories} relationshipTypes={relationshipTypes} onOpenChar={onOpenChar} onOpenStory={onOpenStory}/></div>;
+    if (section==="gallery") return <div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><GalleryTabContent images={galleryImages} galleryEntries={galleryEntries} onUpdateEntries={setGalleryEntries}/></div>;
+    if (section==="notes") return <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}><NotesTabContent notes={notes} setNotes={setNotes}/></div>;
+    if (section==="sessions") return <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}><SessionLogTabContent notes={notes} setNotes={setNotes} chars={chars} stories={stories} setStories={setStories} storyStatuses={storyStatuses} onOpenStory={onOpenStory}/></div>;
+    if (section==="hooks") return <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}><HooksTabContent notes={notes} setNotes={setNotes} chars={chars} factions={factions} locations={locations} stories={stories} setStories={setStories} artifacts={artifacts} hookStatuses={hookStatuses} onOpenStory={onOpenStory} onOpenChar={onOpenChar} onPinHook={handlePinHook} onPinCharHook={handlePinCharHook} onUpdateStory={updateStory} onUpdateChar={updateChar}/></div>;
+    if (section==="settings") return <div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} locationTypes={locationTypes} setLocationTypes={setLocationTypes} rarities={rarities} setRarities={setRarities} deityAlignments={deityAlignments} setDeityAlignments={setDeityAlignments} setChars={updateCharsFromSettings} eras={eras} setEras={setEras}/></div>;
+    return null;
+  }
+
   return (
     <GalleryContext.Provider value={{ openGallery }}>
     <div style={{ display:"flex", height:"100vh", width:"100vw", background:"#0d0b14", color:"#e8d5b7", fontFamily:"system-ui,sans-serif" }}>
-      <div style={{ width:sidebarCollapsed?52:200, background:"#110e1c", borderRight:"1px solid #2a1f3d", display:"flex", flexDirection:"column", flexShrink:0, transition:"width .18s ease", overflow:"hidden" }}>
-        {sidebarCollapsed ? (
-          /* ── Collapsed sidebar ── */
-          <>
-            <div style={{ padding:"14px 0 10px", borderBottom:"1px solid #2a1f3d", display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-              <div style={{ fontSize:18, color:"#c8a96e" }} title="World Builder">⚗️</div>
-              <button onClick={()=>setSidebarCollapsed(false)} title="Expand sidebar"
-                style={{ width:34, height:28, display:"flex", alignItems:"center", justifyContent:"center", background:"#1a1228", border:"1px solid #7c5cbf", borderRadius:6, color:"#c8a96e", cursor:"pointer", fontSize:15, fontWeight:700, transition:"background .15s, border-color .15s" }}
-                onMouseEnter={e=>{ e.currentTarget.style.background="#2a1a4a"; e.currentTarget.style.borderColor="#a07fe8"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.background="#1a1228"; e.currentTarget.style.borderColor="#7c5cbf"; }}>›</button>
-              <button onClick={()=>setCampaignManagerOpen(true)} title={activeCampaign?.name||"Campaign"}
-                style={{ background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"5px", cursor:"pointer", fontSize:14, lineHeight:1, width:34, textAlign:"center", transition:"border-color .15s" }}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>🗂️</button>
+
+      {/* ── Sidebar: draggable section icons ───────────────────────────────── */}
+      <div style={{ width:74, background:"#110e1c", borderRight:"1px solid #2a1f3d", display:"flex", flexDirection:"column", flexShrink:0, alignItems:"center", paddingTop:8, paddingBottom:4 }}>
+        {/* Top tools */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, paddingBottom:8, borderBottom:"1px solid #2a1f3d", width:"100%", paddingLeft:0, paddingRight:0 }}>
+          <div title="World Builder" style={{ fontSize:24, color:"#c8a96e", lineHeight:1, padding:"4px 0" }}>⚗️</div>
+          <button onClick={()=>setCampaignManagerOpen(true)} title={activeCampaign?.name||"Campaign"}
+            style={{ width:44, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, cursor:"pointer", fontSize:18, lineHeight:1, transition:"border-color .15s" }}
+            onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
+            onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>🗂️</button>
+          <button onClick={()=>setCmdPaletteOpen(true)} title="Search (Ctrl+K)"
+            style={{ width:44, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:"#0d0b14", border:"1px solid #2a1f3d", borderRadius:6, cursor:"pointer", fontSize:18 }}>🔍</button>
+        </div>
+
+        {/* Draggable section icons — drag to open in a panel */}
+        <nav style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", alignItems:"center", gap:1, paddingTop:6, paddingBottom:4, width:"100%" }}>
+          {ALL_TABS.map(t => (
+            <div key={t.id}
+              draggable
+              onDragStart={e => { e.dataTransfer.setData("text/plain", t.id); e.dataTransfer.effectAllowed="copy"; setDraggingSection(t.id); }}
+              onDragEnd={() => setDraggingSection(null)}
+              onDoubleClick={() => openInPanel(1, t.id)}
+              title={`${t.label.replace(/^\S+\s/,"")} — drag to open · double-click for right screen`}
+              style={{ width:50, height:44, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:7, cursor:"grab", fontSize:22, userSelect:"none", flexShrink:0, transition:"background .12s" }}
+              onMouseEnter={e=>e.currentTarget.style.background="#1e1630"}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              {t.icon}
             </div>
-            <nav style={{ flex:1, overflowY:"auto", padding:"8px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
-              <button onClick={()=>setCmdPaletteOpen(true)} title="Command palette (Ctrl+K)"
-                style={{ width:34, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"#0d0b14", border:"1px solid #2a1f3d", borderRadius:6, cursor:"pointer", fontSize:14, marginBottom:6, flexShrink:0 }}>🔍</button>
-              {TABS.map(t=>(
-                <button key={t.id} title={t.label.replace(/^\S+\s/,"")} onClick={e=>{ if(e.ctrlKey){ addPage(t.id); } else { navigateTo(t.id); } }}
-                  style={{ width:34, height:32, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:7, border:"none", background:tab===t.id?"#7c5cbf33":"transparent", cursor:"pointer", fontSize:16, flexShrink:0, borderLeft:tab===t.id?"3px solid #7c5cbf":"3px solid transparent", transition:"background .12s" }}>
-                  {t.icon}
-                </button>
-              ))}
-              <div style={{ borderTop:"1px solid #2a1f3d", marginTop:6, paddingTop:6, width:34 }}>
-                <button title="Settings" onClick={e=>{ if(e.ctrlKey){ addPage("settings"); } else { navigateTo("settings"); } }}
-                  style={{ width:34, height:32, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:7, border:"none", background:tab==="settings"?"#7c5cbf33":"transparent", cursor:"pointer", fontSize:16, borderLeft:tab==="settings"?"3px solid #7c5cbf":"3px solid transparent" }}>
-                  ⚙️
-                </button>
-              </div>
-            </nav>
-            <div style={{ padding:"8px 0", borderTop:"1px solid #2a1f3d", display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
-              <button onClick={()=>setHelpOpen(true)} title="Help & Shortcuts"
-                style={{ width:34, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, color:"#9a7fa0", cursor:"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
-                onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>?</button>
-              <button onClick={undo} disabled={historyLen===0} title={`Undo (Ctrl+Z)${historyLen>0?` — ${historyLen} step${historyLen!==1?"s":""} available`:""}`}
-                style={{ width:34, height:30, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
-                onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color=historyLen===0?"#3a2a5a":"#9a7fa0"; }}>↩</button>
-            </div>
-          </>
-        ) : (
-          /* ── Expanded sidebar ── */
-          <>
-            <div style={{ padding:"16px 16px 12px", borderBottom:"1px solid #2a1f3d" }}>
-              <div style={{ fontSize:20, fontFamily:"Georgia,serif", color:"#c8a96e", lineHeight:1.2 }}>⚗️ World<br/>Builder</div>
-              <div style={{ fontSize:11, color:"#4a3a6a", marginTop:3, marginBottom:8 }}>v0.5.0</div>
-              <button onClick={()=>setSidebarCollapsed(true)}
-                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:5, width:"100%", background:"#1a1228", border:"1px solid #7c5cbf", borderRadius:6, padding:"6px 10px", color:"#c8a96e", cursor:"pointer", fontSize:13, fontWeight:600, marginBottom:8, transition:"background .15s, border-color .15s" }}
-                onMouseEnter={e=>{ e.currentTarget.style.background="#2a1a4a"; e.currentTarget.style.borderColor="#a07fe8"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.background="#1a1228"; e.currentTarget.style.borderColor="#7c5cbf"; }}>
-                <span style={{ fontSize:15, lineHeight:1 }}>‹</span> Fold
-              </button>
-              <button onClick={()=>setCampaignManagerOpen(true)}
-                style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"#1a1228", border:"1px solid #3a2a5a", borderRadius:6, padding:"6px 9px", cursor:"pointer", textAlign:"left", transition:"border-color .15s" }}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>
-                <span style={{ fontSize:11 }}>🗂️</span>
-                <span style={{ flex:1, fontSize:12, color:"#c8a96e", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{activeCampaign?.name||"Campaign"}</span>
-                <span style={{ fontSize:10, color:"#5a4a7a" }}>▾</span>
-              </button>
-            </div>
-            <nav style={{ padding:"12px 8px", flex:1, overflowY:"auto" }}>
-              <button onClick={() => setCmdPaletteOpen(true)} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", textAlign:"left", padding:"8px 12px", borderRadius:8, border:"1px solid #2a1f3d", background:"#0d0b14", color:"#4a3a6a", cursor:"pointer", marginBottom:10, fontSize:13 }}>
-                <span>🔍</span><span style={{ flex:1 }}>Search…</span><kbd style={{ fontSize:10, background:"#1a1228", border:"1px solid #2a1f3d", borderRadius:3, padding:"1px 4px" }}>Ctrl K</kbd>
-              </button>
-              {TABS.map(t=>(
-                <button key={t.id} onClick={e=>{ if(e.ctrlKey){ addPage(t.id); } else { navigateTo(t.id); } }} style={{ display:"block", width:"100%", textAlign:"left", padding:"10px 12px", borderRadius:8, border:"none", background:tab===t.id?"#7c5cbf33":"transparent", color:tab===t.id?"#e8d5b7":"#6a5a8a", cursor:"pointer", marginBottom:4, fontSize:14, fontWeight:tab===t.id?700:400, borderLeft:tab===t.id?"3px solid #7c5cbf":"3px solid transparent" }}>
-                  {t.label}
-                </button>
-              ))}
-              <div style={{ borderTop:"1px solid #2a1f3d", marginTop:8, paddingTop:8 }}>
-                <button onClick={e=>{ if(e.ctrlKey){ addPage("settings"); } else { navigateTo("settings"); } }} style={{ display:"block", width:"100%", textAlign:"left", padding:"10px 12px", borderRadius:8, border:"none", background:tab==="settings"?"#7c5cbf33":"transparent", color:tab==="settings"?"#e8d5b7":"#6a5a8a", cursor:"pointer", fontSize:14, fontWeight:tab==="settings"?700:400, borderLeft:tab==="settings"?"3px solid #7c5cbf":"3px solid transparent" }}>
-                  ⚙️ Settings
-                </button>
-              </div>
-            </nav>
-            <div style={{ padding:"8px 12px", borderTop:"1px solid #2a1f3d", display:"flex", flexDirection:"column", gap:6 }}>
-              <button onClick={()=>setHelpOpen(true)} title="Keyboard shortcuts & help"
-                style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:"#9a7fa0", cursor:"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
-                onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>
-                ? <span>Help & Shortcuts</span>
-              </button>
-              <button onClick={undo} disabled={historyLen===0} title="Undo (Ctrl+Z)"
-                style={{ display:"flex", alignItems:"center", gap:6, width:"100%", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"7px 10px", color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:13, transition:"color .15s, border-color .15s" }}
-                onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color=historyLen===0?"#3a2a5a":"#9a7fa0"; }}>
-                ↩ <span>Undo{historyLen>0?` (${historyLen})`:""}</span>
-              </button>
-            </div>
-            <SaveLoadBar chars={chars} stories={stories} races={races} factions={factions} locations={locations} artifacts={artifacts} loreEvents={loreEvents} relations={relations} notes={notes} mapData={mapData} onImport={handleImport} showToast={showToast}/>
-          </>
-        )}
+          ))}
+        </nav>
+
+        {/* Bottom tools */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, paddingTop:6, borderTop:"1px solid #2a1f3d", width:"100%" }}>
+          <button onClick={()=>setHelpOpen(true)} title="Help & Shortcuts"
+            style={{ width:44, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, color:"#9a7fa0", cursor:"pointer", fontSize:16, transition:"color .15s, border-color .15s" }}
+            onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#9a7fa0"; }}>?</button>
+          <button onClick={undo} disabled={historyLen===0} title={`Undo (Ctrl+Z)${historyLen>0?` — ${historyLen}`:""}`}
+            style={{ width:44, height:36, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, color:historyLen===0?"#3a2a5a":"#9a7fa0", cursor:historyLen===0?"default":"pointer", fontSize:16, transition:"color .15s, border-color .15s" }}
+            onMouseEnter={e=>{ if(historyLen>0){ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#e8d5b7"; }}}
+            onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color=historyLen===0?"#3a2a5a":"#9a7fa0"; }}>↩</button>
+          <SaveLoadBar chars={chars} stories={stories} races={races} factions={factions} locations={locations} artifacts={artifacts} loreEvents={loreEvents} relations={relations} notes={notes} mapData={mapData} onImport={handleImport} showToast={showToast} compact/>
+        </div>
       </div>
 
-      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0 }}>
-        {/* Browser tab bar */}
-        <div style={{ display:"flex", alignItems:"center", background:"#110e1c", borderBottom:"1px solid #2a1f3d", padding:"0 8px", gap:2, flexShrink:0, minHeight:36 }}>
-          {pages.map(p => {
-            const isActive = p.id === activePageId;
-            const title = (() => {
-              if (p.tab==="characters"&&p.selectedCharId) return chars.find(c=>c.id===p.selectedCharId)?.name||"Characters";
-              if (p.tab==="stories"&&p.selectedStoryId) return stories.find(s=>s.id===p.selectedStoryId)?.name||"Stories";
-              if (p.tab==="factions"&&p.selectedFactionId) return factions.find(f=>f.id===p.selectedFactionId)?.name||"Factions";
-              if (p.tab==="locations"&&p.selectedLocationId) return locations.find(l=>l.id===p.selectedLocationId)?.name||"Locations";
-              return ALL_TABS.find(t=>t.id===p.tab)?.label || p.tab;
-            })();
+      {/* ── Panel slots ─────────────────────────────────────────────────────── */}
+      <div style={{ flex:1, display:"flex", overflow:"hidden", minWidth:0, gap:6, padding:"6px", background:"#080610" }}>
+        {panels.map((panel, panelIdx) => {
+          const hasSibling = panels[panelIdx === 0 ? 1 : 0] !== null;
+          const isOver = dragOverPanel?.idx === panelIdx;
+          const overLabel = (() => {
+            if (!dragOverPanel) return "";
+            if (dragOverPanel.isEntity) return dragOverPanel.entityLabel || "Character";
+            return dragOverPanel.section ? (ALL_TABS.find(t=>t.id===dragOverPanel.section)?.label || dragOverPanel.section) : "";
+          })();
+
+          const onDrop = e => {
+            const entityRaw = e.dataTransfer.getData("application/x-wbentity");
+            if (entityRaw) {
+              e.preventDefault();
+              try {
+                const { entityType, id } = JSON.parse(entityRaw);
+                if (entityType === "character") {
+                  setPanels(prev => {
+                    const np = [...prev];
+                    const existing = np[panelIdx];
+                    np[panelIdx] = { ...(existing || PANEL_DEFAULT), section: "characters", selectedCharId: id };
+                    return np;
+                  });
+                }
+              } catch {}
+              setDragOverPanel(null);
+              return;
+            }
+            // Only intercept section drops from the sidebar (tracked by draggingSection)
+            if (draggingSection) {
+              e.preventDefault();
+              if (draggingSection !== panel?.section) openInPanel(panelIdx, draggingSection);
+              setDragOverPanel(null);
+              return;
+            }
+            // File drops and other external drags — don't intercept, let native handlers take over
+            setDragOverPanel(null);
+          };
+          const onDragOver = e => {
+            const isEntity = e.dataTransfer.types.includes("application/x-wbentity");
+            const isSection = !!draggingSection;
+            // Only intercept internal drags (sidebar sections or entity chips); let file drags pass through
+            if (!isEntity && !isSection) return;
+            e.preventDefault();
+            if (isEntity) {
+              if (!dragOverPanel || dragOverPanel.idx !== panelIdx) setDragOverPanel({ idx: panelIdx, isEntity: true, entityLabel: "Character" });
+              return;
+            }
+            if (draggingSection && draggingSection === panel?.section) { setDragOverPanel(null); return; }
+            if (!dragOverPanel || dragOverPanel.idx !== panelIdx) setDragOverPanel({ idx: panelIdx, section: draggingSection });
+          };
+          const onDragLeave = e => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setDragOverPanel(null);
+          };
+
+          if (!panel) {
             return (
-              <div key={p.id} onClick={()=>setActivePageId(p.id)}
-                style={{ display:"flex", alignItems:"center", gap:6, padding:"0 10px", height:34, borderRadius:"6px 6px 0 0", cursor:"pointer", background:isActive?"#1a1228":"transparent", border:isActive?"1px solid #3a2a5a":"1px solid transparent", borderBottom:isActive?"1px solid #1a1228":"none", marginBottom:isActive?-1:0, color:isActive?"#e8d5b7":"#6a5a8a", fontSize:12, whiteSpace:"nowrap", maxWidth:160, transition:"background .12s, color .12s", userSelect:"none" }}>
-                <span style={{ overflow:"hidden", textOverflow:"ellipsis", maxWidth:120 }}>{title}</span>
-                {pages.length > 1 && (
-                  <span onClick={e=>{ e.stopPropagation(); closePage(p.id); }} style={{ fontSize:14, lineHeight:1, opacity:.5, padding:"0 2px", borderRadius:3, transition:"opacity .12s" }}
-                    onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=.5}>×</span>
-                )}
+              <div key={panelIdx}
+                onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+                style={{ flex: hasSibling ? "0 0 80px" : 1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background: isOver ? "#1a1040" : "#0d0b14", border: isOver ? "2px dashed #7c5cbf" : "1px solid #1e1630", transition:"background .15s", cursor:"default", position:"relative" }}>
+                {isOver
+                  ? <div style={{ textAlign:"center", pointerEvents:"none" }}>
+                      <div style={{ fontSize:28, marginBottom:8 }}>{dragOverPanel?.isEntity ? "👤" : "+"}</div>
+                      <div style={{ fontSize:13, color:"#c8a96e", fontFamily:"Georgia,serif" }}>{dragOverPanel?.isEntity ? `Open ${overLabel}` : `Add ${overLabel}`}</div>
+                    </div>
+                  : hasSibling
+                    ? <span style={{ color:"#2a1f3d", fontSize:22, userSelect:"none" }}>+</span>
+                    : <div style={{ textAlign:"center", pointerEvents:"none" }}>
+                        <div style={{ fontSize:44, opacity:.18, marginBottom:14 }}>⚗️</div>
+                        <div style={{ color:"#3a2a5a", fontSize:14, fontFamily:"Georgia,serif", lineHeight:1.6 }}>Drag a section<br/>from the sidebar</div>
+                      </div>
+                }
               </div>
             );
-          })}
-          <button onClick={()=>addPage()} title="New tab"
-            style={{ background:"none", border:"1px solid transparent", borderRadius:4, color:"#5a4a7a", cursor:"pointer", fontSize:14, fontWeight:700, padding:"1px 7px", lineHeight:"20px", transition:"color .12s, border-color .12s", marginLeft:2 }}
-            onMouseEnter={e=>{ e.currentTarget.style.color="#c8a96e"; e.currentTarget.style.borderColor="#3a2a5a"; }} onMouseLeave={e=>{ e.currentTarget.style.color="#5a4a7a"; e.currentTarget.style.borderColor="transparent"; }}>+</button>
-        </div>
-        {/* Each browser page tab gets its own independent component tree */}
-        {pages.map(p => {
-          const pageUpdPg = updates =>
-            setPages(ps => ps.map(page => page.id === p.id ? { ...page, ...updates } : page));
+          }
 
-          // Per-page char filtering
-          const pq = p.query.toLowerCase();
-          const filterPageChars = list => list.filter(c => {
-            const raceLabel = getRaceLabel(races,c.raceId,c.subraceId).toLowerCase();
-            const locationLabel = locations.find(l=>l.id===c.locationId)?.name?.toLowerCase()||"";
-            const factionLabels = factions.filter(f=>(c.factions||[]).some(e=>e.factionId===f.id)).map(f=>f.name.toLowerCase()).join(" ");
-            const matchQ = !pq||["name","shortDescription","description","secret","origin","class"].some(k=>c[k]?.toLowerCase().includes(pq))||raceLabel.includes(pq)||locationLabel.includes(pq)||factionLabels.includes(pq);
-            const pf = p.filters;
-            const matchF = (!pf.raceId||c.raceId===pf.raceId)&&(!pf.locationId||c.locationId===pf.locationId)&&(!pf.status||c.status===pf.status)&&(!pf.factionId||(c.factions||[]).some(e=>e.factionId===pf.factionId));
-            return matchQ && matchF;
-          });
-          const pAllPlayers = chars.filter(c => c.type==="player");
-          const pMain = filterPageChars(chars.filter(c=>c.type==="main")).sort((a,b)=>a.name.localeCompare(b.name));
-          const pSide = filterPageChars(chars.filter(c=>c.type==="side")).sort((a,b)=>a.name.localeCompare(b.name));
-
-          // Per-page story filtering
-          const sq = p.storyQuery.toLowerCase();
-          const pMainStory = stories.find(s=>s.isMain)||null;
-          const pPlayerStories = stories.filter(s=>s.playerId&&!s.isMain);
-          const storyStatusOrder = Object.fromEntries(storyStatuses.map((s,i)=>[s.name,i]));
-          const pOtherStories = stories.filter(s=>!s.isMain&&!s.playerId).filter(s=>{
-            const matchText=!sq||s.name.toLowerCase().includes(sq)||(s.summary||"").toLowerCase().includes(sq);
-            return matchText&&(!p.storyStatusFilter||s.status===p.storyStatusFilter);
-          }).sort((a,b)=>(storyStatusOrder[a.status]??9999)-(storyStatusOrder[b.status]??9999));
-
-          // Per-page selected entities
-          const pSelectedChar     = chars.find(c=>c.id===p.selectedCharId)||null;
-          const pSelectedStory    = stories.find(s=>s.id===p.selectedStoryId)||null;
-          const pSelectedFaction  = factions.find(f=>f.id===p.selectedFactionId)||null;
-          const pSelectedLocation = locations.find(l=>l.id===p.selectedLocationId)||null;
-
+          const sectionLabel = ALL_TABS.find(t=>t.id===panel.section)?.label || panel.section;
           return (
-            <div key={p.id} style={{ display: p.id===activePageId ? "contents" : "none" }}>
-              {p.prevTab&&p.prevTab!==p.tab&&(
-                <div style={{ padding:"18px 32px 0", flexShrink:0 }}>
-                  <button onClick={()=>pageUpdPg({ tab: p.prevTab, prevTab: null })} style={{ display:"inline-flex", alignItems:"center", gap:6, background:"transparent", border:"1px solid #3a2a5a", borderRadius:8, padding:"6px 14px", color:"#7c5cbf", cursor:"pointer", fontSize:13, fontWeight:600, transition:"border-color .15s, color .15s" }}
-                    onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
-                    onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
-                    ← Back to {ALL_TABS.find(t=>t.id===p.prevTab)?.label||p.prevTab}
-                  </button>
+            <div key={panelIdx}
+              style={{ flex: 1, display:"flex", flexDirection:"column", overflow:"hidden", minWidth:0, border:"1px solid #1e1630", borderRadius:6, position:"relative", transform:"translateZ(0)" }}
+              onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+              {/* Panel header */}
+              <div style={{ display:"flex", alignItems:"center", padding:"0 12px 0 8px", background:"#110e1c", borderBottom:"1px solid #2a1f3d", flexShrink:0, height:36, gap:4 }}>
+                {(panel.history||[]).length > 0 && (
+                  <button onClick={()=>goBack(panelIdx)} title="Go back"
+                    style={{ background:"none", border:"none", color:"#7c5cbf", cursor:"pointer", fontSize:15, lineHeight:1, padding:"2px 6px", borderRadius:4, flexShrink:0, transition:"color .12s" }}
+                    onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"}
+                    onMouseLeave={e=>e.currentTarget.style.color="#7c5cbf"}>←</button>
+                )}
+                <span style={{ fontSize:13, color:"#c8a96e", fontWeight:600, flex:1 }}>{sectionLabel}</span>
+                <button onClick={()=>closePanel(panelIdx)}
+                  style={{ background:"none", border:"none", color:"#4a3a6a", cursor:"pointer", fontSize:18, lineHeight:1, padding:"2px 4px", borderRadius:4, transition:"color .12s" }}
+                  onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
+                  onMouseLeave={e=>e.currentTarget.style.color="#4a3a6a"}>×</button>
+              </div>
+              {/* Section content */}
+              <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}>
+                {renderPanelSection(panel, panelIdx)}
+              </div>
+              {/* Drop overlay */}
+              {isOver && (
+                <div style={{ position:"absolute", inset:0, zIndex:50, background:"#0d0b14cc", border:"2px dashed #7c5cbf", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10, pointerEvents:"none", backdropFilter:"blur(2px)" }}>
+                  <div style={{ fontSize:36 }}>{dragOverPanel?.isEntity ? "👤" : "+"}</div>
+                  <div style={{ fontSize:16, color:"#c8a96e", fontFamily:"Georgia,serif", fontWeight:700 }}>Open {overLabel}</div>
+                  <div style={{ fontSize:12, color:"#7c5cbf" }}>
+                    {dragOverPanel?.isEntity ? "Drop to view in this screen" : "Drop to replace this screen"}
+                  </div>
                 </div>
               )}
-              <div style={{ display: p.tab==="characters" ? "contents" : "none" }}>
-                <CharactersTabContent
-                  chars={chars} races={races} factions={factions} locations={locations}
-                  stories={stories} loreEvents={loreEvents} artifacts={artifacts}
-                  charStatuses={charStatuses} storyStatuses={storyStatuses}
-                  hookStatuses={hookStatuses} relationshipTypes={relationshipTypes}
-                  allPlayers={pAllPlayers} main={pMain} side={pSide}
-                  query={p.query} filters={p.filters}
-                  selectedChar={pSelectedChar} selectedCharId={p.selectedCharId}
-                  charSubTab={p.charSubTab} mainCollapsed={p.mainCollapsed} sideCollapsed={p.sideCollapsed}
-                  updPg={pageUpdPg}
-                  onNewChar={openCharModal} onDeleteChar={deleteChar} onCancelNew={cancelNewChar}
-                  onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction} onOpenChar={handleOpenChar} onOpenArtifact={handleOpenArtifactInStory}
-                  onSaveChar={saveChar} onSaveFaction={saveFaction} onUpdateArtifacts={updateArtifacts}
-                  onPinCharHook={handlePinCharHook} pinnedCharHookIds={pinnedCharHookIds} rarities={rarities}/>
-              </div>
-              <div style={{ display: p.tab==="stories" ? "contents" : "none" }}>
-                <StoriesTabContent
-                  stories={stories} chars={chars} factions={factions} locations={locations} artifacts={artifacts}
-                  storyStatuses={storyStatuses} hookStatuses={hookStatuses}
-                  storyQuery={p.storyQuery} storyStatusFilter={p.storyStatusFilter}
-                  selectedStory={pSelectedStory} selectedStoryId={p.selectedStoryId}
-                  storySubTab={p.storySubTab} storyHighlightEventId={p.storyHighlightEventId}
-                  mainStory={pMainStory} playerStories={pPlayerStories} otherStories={pOtherStories}
-                  currentTimelineDate={currentTimelineDate}
-                  updPg={pageUpdPg}
-                  onNewStory={openStoryModal} onDeleteStory={deleteStory} onCancelNew={cancelNewStory}
-                  onSetMain={setMainStory} onSetPlayerStory={setPlayerStory} onUpdateStory={updateStory}
-                  onOpenChar={handleOpenChar} onOpenFaction={handleOpenFaction} onOpenLocation={handleOpenLocation}
-                  onOpenArtifact={handleOpenArtifactInStory} onUpdateArtifacts={updateArtifacts}
-                  onAskConfirm={askConfirm} onCloseConfirm={closeConfirm}
-                  onPinHook={handlePinHook} pinnedHookIds={pinnedHookIds} rarities={rarities}/>
-              </div>
-              <div style={{ display: p.tab==="factions" ? "contents" : "none" }}>
-                <FactionsTabContent
-                  factions={factions} chars={chars} locations={locations}
-                  selectedFaction={pSelectedFaction} selectedFactionId={p.selectedFactionId}
-                  updPg={pageUpdPg}
-                  onNewFaction={openFactionModal} onCancelNew={cancelNewFaction}
-                  onSaveFaction={saveFaction} onDeleteFaction={deleteFaction} onOpenChar={handleOpenChar} onSaveChar={saveChar}/>
-              </div>
-              <div style={{ display: p.tab==="timeline" ? "contents" : "none" }}>
-                <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}>
-                  <div style={{ padding:"28px 32px 12px", flexShrink:0 }}>
-                    <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:"0 0 6px", fontSize:26 }}>Timeline</h1>
-                    <p style={{ color:"#5a4a7a", fontSize:13, margin:0 }}>All events across every story, grouped by date.</p>
-                  </div>
-                  <div style={{ flex:1, overflowY:"auto", padding:"0 32px 28px", minHeight:0 }}>
-                    <GlobalTimeline stories={stories} chars={chars} loreEvents={loreEvents} eras={eras} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar}/>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: p.tab==="locations" ? "contents" : "none" }}>
-                <LocationsTabContent
-                  locations={locations} chars={chars} factions={factions} stories={stories} mapData={mapData}
-                  locationQuery={p.locationQuery} locationTypeFilter={p.locationTypeFilter} collapsedLocTypes={p.collapsedLocTypes}
-                  selectedLocation={pSelectedLocation} selectedLocationId={p.selectedLocationId}
-                  updPg={pageUpdPg}
-                  onNewLocation={openLocationModal}
-                  onSaveLocation={saveLocation} onDeleteLocation={deleteLocation}
-                  onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onOpenFaction={handleOpenFaction}
-                  onSaveFaction={saveFaction}
-                  onShowOnMap={handleShowOnMap}
-                  locationTypes={locationTypes}/>
-              </div>
-              <div style={{ display: p.tab==="items" ? "contents" : "none" }}><ArtifactsTab artifacts={artifacts} onUpdateArtifacts={updateArtifacts} chars={chars} stories={stories} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navArtifactId={p.itemNavId} rarities={rarities}/></div>
-              <div style={{ display: p.tab==="map" ? "contents" : "none" }}><MapTab mapData={mapData} onUpdateMapData={updateMapData} locations={locations} onOpenLocation={handleOpenLocation} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} navTarget={p.mapNavTarget} locationTypes={locationTypes}/></div>
-              <div style={{ display: p.tab==="lore" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><LoreTab events={loreEvents} chars={chars} onUpdateEvents={updateLoreEvents} onOpenChar={handleOpenChar} onAskConfirm={askConfirm} onCloseConfirm={closeConfirm} deities={deities} onUpdateDeities={updateDeities} factions={factions} locations={locations} deityAlignments={deityAlignments} eras={eras}/></div></div>
-              <div style={{ display: p.tab==="relations" ? "contents" : "none" }}><div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}><RelationshipWeb chars={chars} stories={stories} relationshipTypes={relationshipTypes} onOpenChar={handleOpenChar} onOpenStory={handleOpenStory}/></div></div>
-              <div style={{ display: p.tab==="gallery" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><GalleryTabContent images={galleryImages} galleryEntries={galleryEntries} onUpdateEntries={setGalleryEntries}/></div></div>
-              <div style={{ display: p.tab==="notes" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><NotesTabContent notes={notes} setNotes={setNotes} chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts} setStories={setStories} onOpenStory={handleOpenStory} onOpenChar={handleOpenChar} onPinHook={handlePinHook} onPinCharHook={handlePinCharHook} onRemovePin={handleRemovePin} hookStatuses={hookStatuses} storyStatuses={storyStatuses} onUpdateStory={updateStory} onUpdateChar={updateChar}/></div></div>
-              <div style={{ display: p.tab==="settings" ? "contents" : "none" }}><div style={{ flex:1, overflowY:"auto", padding:"28px 32px" }}><SettingsTab races={races} setRaces={updateRaces} charStatuses={charStatuses} setCharStatuses={updateCharStatuses} relationshipTypes={relationshipTypes} setRelationshipTypes={updateRelationshipTypes} storyStatuses={storyStatuses} setStoryStatuses={updateStoryStatuses} hookStatuses={hookStatuses} setHookStatuses={updateHookStatuses} locationTypes={locationTypes} setLocationTypes={setLocationTypes} rarities={rarities} setRarities={setRarities} deityAlignments={deityAlignments} setDeityAlignments={setDeityAlignments} setChars={updateCharsFromSettings} eras={eras} setEras={setEras}/></div></div>
             </div>
           );
         })}
@@ -1403,7 +1419,7 @@ export default function App() {
             <p style={{ color:"#9a7fa0", fontSize:13, margin:"0 0 16px" }}>This location is pinned on multiple maps. Choose one:</p>
             <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
               {mapPicker.maps.map(({ map, pin }) => (
-                <button key={map.id} onClick={() => { updPg({ tab: "map", prevTab: tab, mapNavTarget: { mapId: map.id, pin } }); setMapPicker(null); }}
+                <button key={map.id} onClick={() => { navPanel(mapPicker.panelIdx ?? 0, { section:"map", mapNavTarget: { mapId: map.id, pin } }); setMapPicker(null); }}
                   style={{ background:"#2a1f3d", border:"1px solid #3a2a5a", borderRadius:8, color:"#e8d5b7", cursor:"pointer", fontSize:13, padding:"10px 16px", textAlign:"left", transition:"border-color .15s" }}
                   onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
                   onMouseLeave={e=>e.currentTarget.style.borderColor="#3a2a5a"}>

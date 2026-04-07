@@ -63,6 +63,12 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [sidebarType, setSidebarType]     = useState("");
   const [confirmRemovePinId, setConfirmRemovePinId] = useState(null);
+  const [sidebarTab, setSidebarTab]       = useState("pins"); // "pins" | "roads"
+  const [roadMode, setRoadMode]           = useState(false);
+  const [drawingRoad, setDrawingRoad]     = useState(null); // { editingId?:id, locationIds:[], name:"", color:"#c8a96e" }
+  const [hoveredRoadId, setHoveredRoadId] = useState(null);
+  const [confirmRemoveRoadId, setConfirmRemoveRoadId] = useState(null);
+  const [editingRoadId, setEditingRoadId] = useState(null); // road open for inline name/color edit
 
   const viewportRef = useRef();
   const imgRef      = useRef();
@@ -99,6 +105,7 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
   const activeMap = maps.find(m => m.id === activeMapId) || null;
   const image     = activeMap?.image || null;
   const pins      = activeMap?.pins  || [];
+  const roads     = activeMap?.roads || [];
   const usedIds   = new Set(pins.map(p => p.locationId));
   const available = locations.filter(l => !usedIds.has(l.id));
   const availableTypes = [...new Set(available.map(l => l.type).filter(Boolean))].sort();
@@ -237,6 +244,50 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
 
   const removePin = id => updateActiveMap({ pins: pins.filter(p => p.id !== id) });
 
+  // ── Road drawing ──────────────────────────────────────────────────────────────
+  const ROAD_STYLES = [
+    { id:"solid",   label:"—",   dasharray: null },
+    { id:"dashed",  label:"- -", dasharray: "10 5" },
+    { id:"dotted",  label:"···", dasharray: "2 5" },
+    { id:"striped", label:"═",   dasharray: "10 4 3 4" },
+  ];
+  const roadDash = style => ROAD_STYLES.find(s => s.id === style)?.dasharray || null;
+
+  const startRoadMode = () => {
+    setRoadMode(true);
+    setPlacing(false);
+    setPendingPin(null);
+    setDrawingRoad({ locationIds: [], name: "", color: "#c8a96e", style: "solid" });
+    setSidebarTab("roads");
+  };
+  const startEditPoints = road => {
+    setRoadMode(true);
+    setPlacing(false);
+    setPendingPin(null);
+    setDrawingRoad({ editingId: road.id, locationIds: [...road.locationIds], name: road.name, color: road.color, style: road.style || "solid" });
+    setSidebarTab("roads");
+  };
+  const cancelRoadMode = () => { setRoadMode(false); setDrawingRoad(null); };
+  const finishRoad = () => {
+    if (!drawingRoad || drawingRoad.locationIds.length < 2) { cancelRoadMode(); return; }
+    const name = drawingRoad.name.trim() || `Road ${roads.length + 1}`;
+    const updated = { id: drawingRoad.editingId || uid(), name, color: drawingRoad.color, style: drawingRoad.style || "solid", locationIds: drawingRoad.locationIds };
+    const newRoads = drawingRoad.editingId
+      ? roads.map(r => r.id === drawingRoad.editingId ? updated : r)
+      : [...roads, updated];
+    updateActiveMap({ roads: newRoads });
+    cancelRoadMode();
+  };
+  const togglePinInRoad = locationId => {
+    setDrawingRoad(r => {
+      const ids = r.locationIds;
+      return ids.includes(locationId)
+        ? { ...r, locationIds: ids.filter(id => id !== locationId) }
+        : { ...r, locationIds: [...ids, locationId] };
+    });
+  };
+  const deleteRoad = id => updateActiveMap({ roads: roads.filter(r => r.id !== id) });
+
   const centerOnPin = pin => {
     const el = viewportRef.current;
     const img = imgRef.current;
@@ -247,7 +298,18 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
     setPan({ x: rect.width / 2 - imgX * zoomRef.current, y: rect.height / 2 - imgY * zoomRef.current });
   };
 
-  const cursor = placing ? "crosshair" : dragging ? "grabbing" : "grab";
+  // Escape cancels road mode or pin placement
+  useEffect(() => {
+    const handler = e => {
+      if (e.key !== "Escape") return;
+      if (roadMode) { cancelRoadMode(); return; }
+      if (placing) { setPlacing(false); setPendingPin(null); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [roadMode, placing]);
+
+  const cursor = placing ? "crosshair" : roadMode ? "crosshair" : dragging ? "grabbing" : "grab";
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -276,14 +338,23 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
                 style={{ ...btnSecondary, background: showLabels?"#2a1f3d":"transparent", borderColor: showLabels?"#7c5cbf":"#3a2a5a", color: showLabels?"#c8a96e":"#9a7fa0" }}>
                 🏷️ {showLabels ? "Labels On" : "Labels Off"}
               </button>
-              {placing ? (
+              {roadMode ? (
+                <button onClick={cancelRoadMode} style={btnSecondary}>✕ Cancel Road</button>
+              ) : placing ? (
                 <button onClick={()=>{ setPendingPin(null); setPlacing(false); }} style={btnSecondary}>✕ Cancel</button>
               ) : (
-                <button onClick={()=>{ setPendingPin(null); setPlacing(true); }} disabled={available.length===0}
-                  title={available.length===0?"All locations already pinned":""}
-                  style={{...btnPrimary, opacity:available.length===0?0.5:1, cursor:available.length===0?"default":"pointer"}}>
-                  📍 Place Pin
-                </button>
+                <>
+                  <button onClick={()=>{ setPendingPin(null); setPlacing(true); }} disabled={available.length===0}
+                    title={available.length===0?"All locations already pinned":""}
+                    style={{...btnPrimary, opacity:available.length===0?0.5:1, cursor:available.length===0?"default":"pointer"}}>
+                    📍 Place Pin
+                  </button>
+                  <button onClick={startRoadMode} disabled={pins.length < 2}
+                    title={pins.length < 2 ? "Place at least 2 pins first" : "Draw a road between pins"}
+                    style={{...btnSecondary, opacity:pins.length<2?0.5:1, cursor:pins.length<2?"default":"pointer"}}>
+                    🛤️ Draw Road
+                  </button>
+                </>
               )}
             </>
           )}
@@ -352,6 +423,40 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
           🖱️ Click on the map to place a pin &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Drag to pan
         </div>
       )}
+      {roadMode && drawingRoad && (
+        <div style={{ background:"#1a3a1a", border:"1px solid #3a6a3a", borderRadius:8, padding:"8px 16px", marginBottom:8, flexShrink:0, display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:13, color:"#a8d8a8" }}>🛤️ Click location pins to add them to the road &nbsp;·&nbsp; Esc to cancel</span>
+          <span style={{ fontSize:12, color:"#5a8a5a" }}>{drawingRoad.locationIds.length} point{drawingRoad.locationIds.length!==1?"s":""} selected</span>
+          <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:8 }}>
+            <input value={drawingRoad.name} onChange={e=>setDrawingRoad(r=>({...r,name:e.target.value}))}
+              placeholder="Road name…"
+              style={{ background:"#0d1a0d", border:"1px solid #3a6a3a", borderRadius:5, color:"#e8d5b7", fontSize:12, padding:"4px 8px", outline:"none", width:120 }}/>
+            <input type="color" value={drawingRoad.color}
+              onChange={e=>setDrawingRoad(r=>({...r,color:e.target.value}))}
+              title="Road color"
+              style={{ width:28, height:28, padding:2, border:"1px solid #3a6a3a", borderRadius:4, background:"transparent", cursor:"pointer" }}/>
+            {/* Style picker */}
+            <div style={{ display:"flex", gap:3 }}>
+              {ROAD_STYLES.map(s => {
+                const sel = (drawingRoad.style||"solid") === s.id;
+                return (
+                  <button key={s.id} onClick={()=>setDrawingRoad(r=>({...r,style:s.id}))} title={s.id}
+                    style={{ background:sel?"#2a4a2a":"transparent", border:`1px solid ${sel?"#5a9a5a":"#3a6a3a"}`, borderRadius:4, cursor:"pointer", padding:"3px 7px" }}>
+                    <svg width="22" height="8" viewBox="0 0 22 8">
+                      <line x1="1" y1="4" x2="21" y2="4" stroke={sel?"#a8d8a8":"#5a8a5a"} strokeWidth="2"
+                        strokeDasharray={s.dasharray||undefined} strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={finishRoad} disabled={drawingRoad.locationIds.length < 2}
+              style={{...btnPrimary, fontSize:12, padding:"4px 14px", opacity:drawingRoad.locationIds.length<2?0.5:1}}>
+              ✓ Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* No maps */}
       {maps.length === 0 && (
@@ -392,6 +497,42 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
           <div style={{ position:"absolute", top:0, left:0, transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`, transformOrigin:"0 0", userSelect:"none" }}>
             <div style={{ position:"relative", display:"inline-block", lineHeight:0 }}>
               <img ref={imgRef} src={image} alt={activeMap.name} draggable={false} style={{ display:"block", maxWidth:"none" }}/>
+
+              {/* Roads SVG overlay */}
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none"
+                style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none", zIndex:2, overflow:"visible" }}>
+                {roads.map(road => {
+                  const pts = road.locationIds
+                    .map(lid => { const p = pins.find(pin => pin.locationId === lid); return p ? `${p.x},${p.y}` : null; })
+                    .filter(Boolean);
+                  if (pts.length < 2) return null;
+                  const isHov = hoveredRoadId === road.id;
+                  const dash = roadDash(road.style);
+                  return (
+                    <polyline key={road.id} points={pts.join(" ")}
+                      stroke={road.color || "#c8a96e"} strokeWidth={isHov ? 3 : 2}
+                      strokeDasharray={dash || undefined}
+                      strokeLinecap="round" strokeLinejoin="round"
+                      fill="none" vectorEffect="non-scaling-stroke"
+                      opacity={isHov ? 1 : 0.75}
+                      style={{ transition:"stroke-width .15s, opacity .15s" }}/>
+                  );
+                })}
+                {/* Preview while drawing */}
+                {roadMode && drawingRoad && drawingRoad.locationIds.length > 0 && (() => {
+                  const pts = drawingRoad.locationIds
+                    .map(lid => { const p = pins.find(pin => pin.locationId === lid); return p ? `${p.x},${p.y}` : null; })
+                    .filter(Boolean);
+                  if (pts.length < 1) return null;
+                  const dash = roadDash(drawingRoad.style);
+                  return (
+                    <polyline points={pts.join(" ")}
+                      stroke={drawingRoad.color || "#c8a96e"} strokeWidth={2}
+                      strokeDasharray={dash || "4 3"} strokeLinecap="round" strokeLinejoin="round"
+                      fill="none" vectorEffect="non-scaling-stroke" opacity={0.9}/>
+                  );
+                })()}
+              </svg>
 
               {/* Pending pin */}
               {pendingPin && (
@@ -472,13 +613,19 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
                     onClick={e=>e.stopPropagation()}>
 
                     {/* Icon marker — replaces dot, constant visual size */}
-                    <div style={{ position:"absolute", transform:`translate(-50%,-50%) scale(${s})`, transformOrigin:"center center",
-                        cursor:"pointer", fontSize:20, lineHeight:1,
-                        filter:`drop-shadow(0 1px 4px #000b) drop-shadow(0 0 ${isHov?8:3}px ${isHov?"#c8a96e":"#7c5cbf"})`,
-                        transition:"filter .15s" }}
-                      onClick={()=>{ if(!placing && !didDrag.current) onOpenLocation(loc); }}>
-                      {locIcon(loc)}
-                    </div>
+                    {(() => {
+                      const inRoad = roadMode && drawingRoad?.locationIds.includes(pin.locationId);
+                      return (
+                        <div style={{ position:"absolute", transform:`translate(-50%,-50%) scale(${s})`, transformOrigin:"center center",
+                            cursor: roadMode ? "pointer" : "pointer", fontSize:20, lineHeight:1,
+                            filter:`drop-shadow(0 1px 4px #000b) drop-shadow(0 0 ${isHov||inRoad?8:3}px ${inRoad?"#a8d8a8":isHov?"#c8a96e":"#7c5cbf"})`,
+                            transition:"filter .15s", outline: inRoad ? `${2/zoom}px solid #a8d8a8` : "none", borderRadius:"50%" }}
+                          onClick={e=>{ e.stopPropagation(); if(roadMode && !didDrag.current){ togglePinInRoad(pin.locationId); } else if(!placing && !didDrag.current){ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenLocation(loc,{newTab:true});}else{onOpenLocation(loc);} } }}
+                          onAuxClick={e=>{ if(e.button===1&&!roadMode&&!placing&&!didDrag.current){e.preventDefault();e.stopPropagation();onOpenLocation(loc,{newTab:true});} }}>
+                          {locIcon(loc)}
+                        </div>
+                      );
+                    })()}
 
                     {/* Label — always visible when showLabels, tooltip on hover otherwise */}
                     {(isHov || showLabels) && (
@@ -490,7 +637,8 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
                           borderRadius:6, padding:"5px 10px", display:"flex", alignItems:"center", gap:5,
                           whiteSpace:"nowrap", boxShadow:"0 2px 10px #0007", pointerEvents:"auto", transition:"border-color .15s" }}>
                         <span style={{ fontSize:13, color:"#e8d5b7", cursor:"pointer" }}
-                          onClick={()=>{ if(!placing && !didDrag.current) onOpenLocation(loc); }}>
+                          onClick={e=>{ if(!placing && !didDrag.current){ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenLocation(loc,{newTab:true});}else{onOpenLocation(loc);} } }}
+                          onAuxClick={e=>{ if(e.button===1&&!placing&&!didDrag.current){e.preventDefault();onOpenLocation(loc,{newTab:true});} }}>
                           {loc.name}
                         </span>
                         {isHov && (confirmRemovePinId === pin.id
@@ -531,54 +679,141 @@ function MapTab({ mapData, onUpdateMapData, locations, onOpenLocation, onAskConf
 
           return (
             <div style={{ width:210, background:"#0d0b14", borderLeft:"1px solid #2a1f3d", display:"flex", flexDirection:"column", borderRadius:"0 8px 8px 0", flexShrink:0 }}>
-              {/* Header */}
-              <div style={{ padding:"10px 14px", borderBottom:"1px solid #2a1f3d", fontSize:11, color:"#b09060", fontWeight:700, letterSpacing:1, textTransform:"uppercase", flexShrink:0 }}>
-                📍 {pins.length} Pin{pins.length!==1?"s":""}
+              {/* Tab bar */}
+              <div style={{ display:"flex", borderBottom:"1px solid #2a1f3d", flexShrink:0 }}>
+                <button onClick={()=>setSidebarTab("pins")}
+                  style={{ flex:1, background:"none", border:"none", borderBottom:`2px solid ${sidebarTab==="pins"?"#7c5cbf":"transparent"}`, color:sidebarTab==="pins"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:11, fontWeight:700, letterSpacing:1, padding:"8px 0", textTransform:"uppercase", transition:"color .12s" }}>
+                  📍 {pins.length}
+                </button>
+                <button onClick={()=>setSidebarTab("roads")}
+                  style={{ flex:1, background:"none", border:"none", borderBottom:`2px solid ${sidebarTab==="roads"?"#7c5cbf":"transparent"}`, color:sidebarTab==="roads"?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:11, fontWeight:700, letterSpacing:1, padding:"8px 0", textTransform:"uppercase", transition:"color .12s" }}>
+                  🛤️ {roads.length}
+                </button>
               </div>
-              {/* Search + type filter */}
-              {pins.length > 0 && (
-                <div style={{ padding:"8px 10px", borderBottom:"1px solid #1e1630", display:"flex", flexDirection:"column", gap:6, flexShrink:0 }}>
-                  <div style={{ position:"relative" }}>
-                    <span style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:11, pointerEvents:"none" }}>🔍</span>
-                    <input value={sidebarSearch} onChange={e=>setSidebarSearch(e.target.value)}
-                      placeholder="Search pins…"
-                      style={{ width:"100%", background:"#13101f", border:"1px solid #2a1f3d", borderRadius:5, padding:"5px 8px 5px 24px", color:"#e8d5b7", fontSize:11, outline:"none", boxSizing:"border-box" }}/>
-                  </div>
-                  {sidebarTypes.length > 1 && (
-                    <select value={sidebarType} onChange={e=>setSidebarType(e.target.value)}
-                      style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:5, color:sidebarType?"#c8a96e":"#5a4a7a", fontSize:11, padding:"4px 6px", outline:"none", width:"100%" }}>
-                      <option value="">All types</option>
-                      {sidebarTypes.map(t => <option key={t} value={t}>{TYPE_ICONS[t]||"📍"} {t}</option>)}
-                    </select>
+
+              {/* Pins tab */}
+              {sidebarTab === "pins" && (
+                <>
+                  {pins.length > 0 && (
+                    <div style={{ padding:"8px 10px", borderBottom:"1px solid #1e1630", display:"flex", flexDirection:"column", gap:6, flexShrink:0 }}>
+                      <div style={{ position:"relative" }}>
+                        <span style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:11, pointerEvents:"none" }}>🔍</span>
+                        <input value={sidebarSearch} onChange={e=>setSidebarSearch(e.target.value)}
+                          placeholder="Search pins…"
+                          style={{ width:"100%", background:"#13101f", border:"1px solid #2a1f3d", borderRadius:5, padding:"5px 8px 5px 24px", color:"#e8d5b7", fontSize:11, outline:"none", boxSizing:"border-box" }}/>
+                      </div>
+                      {sidebarTypes.length > 1 && (
+                        <select value={sidebarType} onChange={e=>setSidebarType(e.target.value)}
+                          style={{ background:"#13101f", border:"1px solid #2a1f3d", borderRadius:5, color:sidebarType?"#c8a96e":"#5a4a7a", fontSize:11, padding:"4px 6px", outline:"none", width:"100%" }}>
+                          <option value="">All types</option>
+                          {sidebarTypes.map(t => <option key={t} value={t}>{TYPE_ICONS[t]||"📍"} {t}</option>)}
+                        </select>
+                      )}
+                    </div>
                   )}
+                  <div style={{ flex:1, overflowY:"auto" }}>
+                    {pins.length === 0
+                      ? <div style={{ padding:"20px 14px", color:"#3a2a5a", fontSize:12, textAlign:"center" }}>No pins yet.<br/>Click "📍 Place Pin" to start.</div>
+                      : filtered.length === 0
+                        ? <div style={{ padding:"16px 14px", color:"#3a2a5a", fontSize:12, textAlign:"center" }}>No pins match.</div>
+                        : groupOrder.map(type => (
+                            <div key={type}>
+                              <div style={{ padding:"5px 12px", fontSize:10, color:"#5a4a7a", fontWeight:700, letterSpacing:1, textTransform:"uppercase", background:"#0a0814", borderBottom:"1px solid #1a1628", borderTop:"1px solid #1a1628" }}>
+                                {TYPE_ICONS[type]||"📍"} {type}
+                              </div>
+                              {groups[type].map(({ pin, loc }) => (
+                                <div key={pin.id} onClick={()=>centerOnPin(pin)}
+                                  style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px", cursor:"pointer", borderBottom:"1px solid #1a1628", transition:"background .12s" }}
+                                  onMouseEnter={e=>e.currentTarget.style.background="#1e1630"}
+                                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                                  <div style={{ flex:1, minWidth:0 }}>
+                                    <div style={{ fontSize:12, color:"#e8d5b7", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{loc.name}</div>
+                                    {loc.region && <div style={{ fontSize:10, color:"#5a4a7a", marginTop:1 }}>{loc.region}</div>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ))
+                    }
+                  </div>
+                </>
+              )}
+
+              {/* Roads tab */}
+              {sidebarTab === "roads" && (
+                <div style={{ flex:1, overflowY:"auto" }}>
+                  {roads.length === 0
+                    ? <div style={{ padding:"20px 14px", color:"#3a2a5a", fontSize:12, textAlign:"center" }}>No roads yet.<br/>Click "🛤️ Draw Road" to start.</div>
+                    : roads.map(road => {
+                        const stops = road.locationIds.map(lid => locations.find(l => l.id === lid)?.name).filter(Boolean);
+                        const isEditing = editingRoadId === road.id;
+                        return (
+                          <div key={road.id}
+                            onMouseEnter={()=>setHoveredRoadId(road.id)}
+                            onMouseLeave={()=>setHoveredRoadId(null)}
+                            style={{ padding:"8px 12px", borderBottom:"1px solid #1a1628", background: isEditing ? "#1e1630" : "transparent" }}>
+                            {isEditing ? (
+                              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                                <input
+                                  autoFocus
+                                  defaultValue={road.name}
+                                  onBlur={e => { const n=e.target.value.trim(); if(n&&n!==road.name) updateActiveMap({roads:roads.map(r=>r.id===road.id?{...r,name:n}:r)}); }}
+                                  onKeyDown={e=>{ if(e.key==="Enter"||e.key==="Escape") setEditingRoadId(null); }}
+                                  style={{ background:"#0d0b14", border:"1px solid #3a2a5a", borderRadius:4, color:"#e8d5b7", fontSize:12, padding:"4px 7px", outline:"none", width:"100%", boxSizing:"border-box" }}/>
+                                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                                  <input type="color" defaultValue={road.color||"#c8a96e"}
+                                    onChange={e => updateActiveMap({roads:roads.map(r=>r.id===road.id?{...r,color:e.target.value}:r)})}
+                                    style={{ width:24, height:24, padding:2, border:"1px solid #3a2a5a", borderRadius:4, background:"transparent", cursor:"pointer", flexShrink:0 }}/>
+                                  {ROAD_STYLES.map(s => {
+                                    const sel = (road.style||"solid") === s.id;
+                                    return (
+                                      <button key={s.id} onClick={()=>updateActiveMap({roads:roads.map(r=>r.id===road.id?{...r,style:s.id}:r)})} title={s.id}
+                                        style={{ background:sel?"#2a1f3d":"transparent", border:`1px solid ${sel?"#7c5cbf":"#2a1f3d"}`, borderRadius:4, cursor:"pointer", padding:"2px 5px", flexShrink:0 }}>
+                                        <svg width="18" height="7" viewBox="0 0 18 7">
+                                          <line x1="1" y1="3.5" x2="17" y2="3.5" stroke={sel?"#c8b8e8":"#5a4a7a"} strokeWidth="2"
+                                            strokeDasharray={s.dasharray||undefined} strokeLinecap="round"/>
+                                        </svg>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{ display:"flex", gap:6 }}>
+                                  <button onClick={()=>{ setEditingRoadId(null); startEditPoints(road); }}
+                                    style={{ flex:1, background:"#1a2a3a", border:"1px solid #2a4a6a", borderRadius:4, color:"#7aafd4", cursor:"pointer", fontSize:11, padding:"3px 0" }}>
+                                    ✎ Edit Points
+                                  </button>
+                                  <button onClick={()=>setEditingRoadId(null)}
+                                    style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:14, padding:"0 2px" }}>✕</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
+                                  <div style={{ width:10, height:10, borderRadius:"50%", background:road.color||"#c8a96e", flexShrink:0 }}/>
+                                  <span style={{ fontSize:12, color:"#e8d5b7", fontWeight:600, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{road.name}</span>
+                                  <button onClick={()=>{ setEditingRoadId(road.id); setConfirmRemoveRoadId(null); }}
+                                    style={{ background:"none", border:"none", color:"#4a3a5a", cursor:"pointer", fontSize:12, padding:"0 2px", lineHeight:1 }}
+                                    onMouseEnter={e=>e.currentTarget.style.color="#c8a96e"}
+                                    onMouseLeave={e=>e.currentTarget.style.color="#4a3a5a"}>✏️</button>
+                                  {confirmRemoveRoadId === road.id
+                                    ? <>
+                                        <button onClick={()=>{ deleteRoad(road.id); setConfirmRemoveRoadId(null); }} style={{ background:"none", border:"none", color:"#c06060", cursor:"pointer", fontSize:12, padding:"0 2px", fontWeight:700 }}>✓</button>
+                                        <button onClick={()=>setConfirmRemoveRoadId(null)} style={{ background:"none", border:"none", color:"#9a7fa0", cursor:"pointer", fontSize:12, padding:"0 2px" }}>✕</button>
+                                      </>
+                                    : <button onClick={()=>setConfirmRemoveRoadId(road.id)} style={{ background:"none", border:"none", color:"#4a3a5a", cursor:"pointer", fontSize:13, padding:"0 2px", lineHeight:1 }}
+                                        onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
+                                        onMouseLeave={e=>e.currentTarget.style.color="#4a3a5a"}>×</button>
+                                  }
+                                </div>
+                                <div style={{ fontSize:10, color:"#5a4a7a", paddingLeft:16 }}>{stops.join(" → ")}</div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })
+                  }
                 </div>
               )}
-              {/* List */}
-              <div style={{ flex:1, overflowY:"auto" }}>
-                {pins.length === 0
-                  ? <div style={{ padding:"20px 14px", color:"#3a2a5a", fontSize:12, textAlign:"center" }}>No pins yet.<br/>Click "📍 Place Pin" to start.</div>
-                  : filtered.length === 0
-                    ? <div style={{ padding:"16px 14px", color:"#3a2a5a", fontSize:12, textAlign:"center" }}>No pins match.</div>
-                    : groupOrder.map(type => (
-                        <div key={type}>
-                          <div style={{ padding:"5px 12px", fontSize:10, color:"#5a4a7a", fontWeight:700, letterSpacing:1, textTransform:"uppercase", background:"#0a0814", borderBottom:"1px solid #1a1628", borderTop:"1px solid #1a1628" }}>
-                            {TYPE_ICONS[type]||"📍"} {type}
-                          </div>
-                          {groups[type].map(({ pin, loc }) => (
-                            <div key={pin.id} onClick={()=>centerOnPin(pin)}
-                              style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px", cursor:"pointer", borderBottom:"1px solid #1a1628", transition:"background .12s" }}
-                              onMouseEnter={e=>e.currentTarget.style.background="#1e1630"}
-                              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                              <div style={{ flex:1, minWidth:0 }}>
-                                <div style={{ fontSize:12, color:"#e8d5b7", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{loc.name}</div>
-                                {loc.region && <div style={{ fontSize:10, color:"#5a4a7a", marginTop:1 }}>{loc.region}</div>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ))
-                }
-              </div>
             </div>
           );
         })()}

@@ -71,7 +71,8 @@ export default function RelationshipLinker({ relationships, chars, relationshipT
                   style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"6px 8px", cursor:"grab", opacity: dragId === c.id ? 0.4 : 1, transition:"opacity .1s" }}>
                   <Avatar src={c.image} name={c.name} size={26}/>
                   <span
-                    onClick={e=>{ e.stopPropagation(); onOpenChar&&onOpenChar(c); }}
+                    onClick={e=>{ e.stopPropagation(); if(!onOpenChar) return; if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);} }}
+                    onAuxClick={e=>{ if(e.button===1&&onOpenChar){e.preventDefault();e.stopPropagation();onOpenChar(c,{newTab:true});} }}
                     style={{ fontSize:12, color:onOpenChar?"#c8a96e":"#e8d5b7", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", cursor:onOpenChar?"pointer":"default" }}
                     onMouseEnter={e=>{ if(onOpenChar) e.currentTarget.style.textDecoration="underline"; }}
                     onMouseLeave={e=>{ e.currentTarget.style.textDecoration="none"; }}>

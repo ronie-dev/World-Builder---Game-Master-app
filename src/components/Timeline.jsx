@@ -301,7 +301,10 @@ export default function Timeline({ events, chars, eras, onSaveEvent, onDelete, o
                 {evChars.length > 0 && (
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                     {evChars.map(c => (
-                      <div key={c.id} onClick={()=>onOpenChar&&onOpenChar(c)} style={{ display:"flex", alignItems:"center", gap:7, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 10px 5px 6px", cursor: onOpenChar?"pointer":"default" }}
+                      <div key={c.id}
+                        onClick={e=>{ if(!onOpenChar) return; if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);} }}
+                        onAuxClick={e=>{ if(e.button===1&&onOpenChar){e.preventDefault();onOpenChar(c,{newTab:true});} }}
+                        style={{ display:"flex", alignItems:"center", gap:7, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 10px 5px 6px", cursor: onOpenChar?"pointer":"default" }}
                         onMouseEnter={e=>{ if(onOpenChar) e.currentTarget.style.borderColor="#5a3da0"; }}
                         onMouseLeave={e=>{ if(onOpenChar) e.currentTarget.style.borderColor="#2a1f3d"; }}>
                         <Avatar src={c.image} name={c.name} size={26}/>

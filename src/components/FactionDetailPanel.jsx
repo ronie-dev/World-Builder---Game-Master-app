@@ -61,6 +61,13 @@ function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveCh
   const renameTier = (id) => {
     const n = editTierName.trim(); if (!n) return;
     updateTiers(tiers.map(t => t.id===id ? {...t, name:n, description:editTierDesc} : t));
+    // Sync role string on all characters assigned to this tier
+    if (onSaveChar) {
+      allMembers.forEach(c => {
+        const entry = (c.factions||[]).find(e => e.factionId===faction.id && e.tierId===id);
+        if (entry) onSaveChar({ ...c, factions: c.factions.map(e => e.factionId===faction.id && e.tierId===id ? {...e, role:n} : e) });
+      });
+    }
     setEditingTierId(null);
   };
   const deleteTier = (id) => {
@@ -156,7 +163,7 @@ function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveCh
                 {isOver && tierMembers.length === 0 && <span style={{ color:"#7c5cbf", fontSize:12 }}>Drop here</span>}
                 {tierMembers.map(c => (
                   <div key={c.id} draggable
-                    onDragStart={()=>setDraggedCharId(c.id)}
+                    onDragStart={e=>{ e.dataTransfer.setData("application/x-wbentity", JSON.stringify({ entityType:"character", id:c.id })); setDraggedCharId(c.id); }}
                     onDragEnd={()=>{ setDraggedCharId(null); setDragOverTier(null); }}
                     onClick={e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);}}}
                     onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenChar(c,{newTab:true});}}}
@@ -271,7 +278,7 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
       <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
       {/* ── Sticky header ── */}
-      <div style={{ position:"sticky", top:0, zIndex:20, borderRadius:"12px 12px 0 0", background:"#13101f", overflow:"hidden" }}>
+      <div style={{ position:"sticky", top:0, zIndex:20, borderRadius:"12px 12px 0 0", background:"#13101f" }}>
       <div style={{ background:`linear-gradient(90deg,#13101f,${color}cc)`, padding:"18px 24px", display:"flex", alignItems:"flex-start", gap:16, borderBottom:"1px solid #2a1f3d" }}>
 
         {/* Portrait */}

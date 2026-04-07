@@ -60,18 +60,23 @@ function FactionRoleRow({ entry, i, allFactions, entries, setEntries, onSaveFact
   // ── Compact pill (faction already chosen, not editing) ──────────────────────
   if (faction && !editing) {
     const fcolor = getFactionColor(allFactions, entry.factionId);
+    // Derive role from current tier name so renames stay in sync
+    const displayRole = entry.tierId
+      ? (tiers.find(t => t.id === entry.tierId)?.name || entry.role)
+      : entry.role;
     return (
       <div style={{ display:"flex", alignItems:"center", gap:8, background:"#0f0c1a", border:"1px solid #2a1f3d", borderRadius:8, padding:"8px 12px", marginBottom:6 }}>
         <span style={{ color:fcolor||"#7c5cbf", fontSize:16, flexShrink:0 }}>⚑</span>
         <span
-          onClick={()=>onOpenFaction&&onOpenFaction(faction)}
+          onClick={e=>{ if(!onOpenFaction) return; if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenFaction(faction,{newTab:true});}else{onOpenFaction(faction);} }}
+          onAuxClick={e=>{ if(e.button===1&&onOpenFaction){e.preventDefault();onOpenFaction(faction,{newTab:true});} }}
           style={{ fontSize:14, color:onOpenFaction?"#c8a96e":"#e8d5b7", flex:1, cursor:onOpenFaction?"pointer":"default", fontWeight:600 }}
           onMouseEnter={e=>{ if(onOpenFaction) e.currentTarget.style.textDecoration="underline"; }}
           onMouseLeave={e=>{ e.currentTarget.style.textDecoration="none"; }}>
           {faction.name}
         </span>
-        {entry.role
-          ? <span style={{ fontSize:12, color:"#9a7fa0", background:"#1a1228", borderRadius:4, padding:"2px 10px", flexShrink:0 }}>{entry.role}</span>
+        {displayRole
+          ? <span style={{ fontSize:12, color:"#9a7fa0", background:"#1a1228", borderRadius:4, padding:"2px 10px", flexShrink:0 }}>{displayRole}</span>
           : <span style={{ fontSize:12, color:"#5a4a7a", fontStyle:"italic", flexShrink:0 }}>No role</span>}
         <button onClick={()=>setEditing(true)} title="Edit"
           style={{ background:"none", border:"none", color:"#7c5cbf", cursor:"pointer", fontSize:12, padding:"0 4px", opacity:.7, flexShrink:0 }}>✏️</button>
@@ -160,7 +165,7 @@ function CharHooksTab({ char, onUpdateChar, hookStatuses, onPinHook, pinnedHookI
   const defaultStatus = statuses[0]?.name || "Potential";
 
   const hooks = char.hooks || [];
-  const addHook = () => onUpdateChar({ ...char, hooks: [...hooks, { id: uid(), title:"New hook", description:"", status: defaultStatus, linkedEntities:[] }] });
+  const addHook = () => onUpdateChar({ ...char, hooks: [{ id: uid(), title:"New hook", description:"", status: defaultStatus, linkedEntities:[] }, ...hooks] });
   const updateHook = updated => onUpdateChar({ ...char, hooks: hooks.map(h => h.id === updated.id ? updated : h) });
   const removeHook = id => onUpdateChar({ ...char, hooks: hooks.filter(h => h.id !== id) });
 
@@ -335,7 +340,8 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
               const rc = rarityColors[a.rarity] || "#9a9a9a";
               return (
                 <div key={a.id}
-                  onClick={onOpenArtifact ? ()=>onOpenArtifact(a) : undefined}
+                  onClick={onOpenArtifact ? e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenArtifact(a,{newTab:true});}else{onOpenArtifact(a);} } : undefined}
+                  onAuxClick={onOpenArtifact ? e=>{ if(e.button===1){e.preventDefault();onOpenArtifact(a,{newTab:true});} } : undefined}
                   style={{ background:"#0f0c1a", border:`1px solid ${rc}33`, borderLeft:`3px solid ${rc}`, borderRadius:10, padding:"10px 14px", display:"flex", gap:10, alignItems:"center", cursor: onOpenArtifact ? "pointer" : "default", transition:"border-color .15s" }}
                   onMouseEnter={e=>{ if(onOpenArtifact) e.currentTarget.style.borderColor=rc+"88"; }}
                   onMouseLeave={e=>{ if(onOpenArtifact) e.currentTarget.style.borderColor=rc+"33"; }}>

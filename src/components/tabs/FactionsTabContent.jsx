@@ -1,74 +1,107 @@
-import { memo } from "react";
-import { ALIGNMENT_COLORS, FACTION_STATUS_COLORS, btnPrimary } from "../../constants.js";
+import { memo, useState, useRef, useEffect } from "react";
+import { ALIGNMENT_COLORS, FACTION_STATUS_COLORS, btnPrimary, inputStyle } from "../../constants.js";
 import Badge from "../Badge.jsx";
 import Avatar from "../Avatar.jsx";
 import FactionDetailPanel from "../FactionDetailPanel.jsx";
-import { EmptyState, CardRow, MiniChip } from "../ui.jsx";
+import { EmptyState } from "../ui.jsx";
 
-function FactionCard({ faction, chars, locations, isSelected, onSelect }) {
-  const members = chars.filter(c => (c.factions||[]).some(e => e.factionId===faction.id) && c.type !== "side");
-  const locationObj = (locations||[]).find(l => l.id === faction.locationId);
-  const locationName = locationObj ? (locationObj.region ? `${locationObj.name} (${locationObj.region})` : locationObj.name) : null;
+// ── Compact faction row ───────────────────────────────────────────────────────
+function FactionRow({ faction, chars, isSelected, onSelect }) {
+  const memberCount = chars.filter(c => (c.factions||[]).some(e => e.factionId===faction.id) && c.type !== "side").length;
   return (
-    <CardRow isSelected={isSelected} onClick={()=>onSelect(faction)}>
-      <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
-        {faction.image && <img src={faction.image} alt="" style={{ width:48, height:48, borderRadius:8, objectFit:"cover", border:"1px solid #3a2a5a", flexShrink:0 }}/>}
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
-            <span style={{ color:"#e8d5b7", fontWeight:700, fontSize:15, fontFamily:"Georgia,serif" }}>⚑ {faction.name}</span>
-            {faction.alignment&&<Badge label={faction.alignment} color={ALIGNMENT_COLORS[faction.alignment]}/>}
-            {faction.status&&<Badge label={faction.status} color={FACTION_STATUS_COLORS[faction.status]||"#3a3a3a"}/>}
-            {locationName&&<span style={{ fontSize:11, color:"#9a7fa0" }}>📍 {locationName}</span>}
-          </div>
-          {faction.description&&<p style={{ margin:"0 0 8px", fontSize:13, color:"#9a7fa0", lineHeight:1.5 }}>{faction.description.slice(0,120)}{faction.description.length>120?"…":""}</p>}
-          {members.length>0&&(
-            <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
-              {members.map(c=>(
-                <MiniChip key={c.id}>
-                  <Avatar src={c.image} name={c.name} size={18}/><span style={{ fontSize:11, color:"#9a7fa0" }}>{c.name}</span>
-                </MiniChip>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </CardRow>
+    <div onClick={() => onSelect(faction)}
+      style={{ display:"flex", alignItems:"center", gap:8, padding:"5px 10px", borderRadius:6, cursor:"pointer", background:isSelected?"#1e1535":"transparent", borderLeft:`2px solid ${isSelected?"#7c5cbf":"transparent"}`, transition:"background .1s" }}
+      onMouseEnter={e=>{ if(!isSelected) e.currentTarget.style.background="#13101e"; }}
+      onMouseLeave={e=>{ if(!isSelected) e.currentTarget.style.background="transparent"; }}>
+      {faction.image
+        ? <img src={faction.image} alt="" style={{ width:22, height:22, borderRadius:4, objectFit:"cover", flexShrink:0 }}/>
+        : <span style={{ fontSize:14, flexShrink:0 }}>⚑</span>}
+      <span style={{ fontSize:13, color:"#e8d5b7", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+        {faction.name}
+      </span>
+      {faction.alignment && <Badge label={faction.alignment} color={ALIGNMENT_COLORS[faction.alignment]} small/>}
+      {faction.status && <Badge label={faction.status} color={FACTION_STATUS_COLORS[faction.status]||"#3a3a3a"} small/>}
+      {memberCount > 0 && <span style={{ fontSize:10, color:"#5a4a7a", flexShrink:0 }}>👤{memberCount}</span>}
+    </div>
   );
 }
 
+// ── Main component ────────────────────────────────────────────────────────────
 function FactionsTabContent({
-  factions, chars, locations,
+  factions, filteredFactions, chars, locations,
+  factionQuery,
   selectedFaction, selectedFactionId,
   updPg,
   onNewFaction, onCancelNew, onSaveFaction, onDeleteFaction, onOpenChar, onSaveChar,
 }) {
-  return (
-    <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, padding:"28px 32px 0" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18, flexShrink:0 }}>
-        <h1 style={{ fontFamily:"Georgia,serif", color:"#e8d5b7", margin:0, fontSize:26 }}>Factions</h1>
-        <button onClick={onNewFaction} style={btnPrimary}>+ New Faction</button>
-      </div>
-      <div style={{ flex:1, display:"flex", gap:24, overflow:"hidden", minHeight:0, paddingBottom:28 }}>
-        <div style={{ flex:1, minWidth:0, overflowY:"auto", paddingRight:12 }}>
-          {factions.length===0
-            ? <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a", border:"1px dashed #3a2a5a", borderRadius:12, fontSize:14 }}>No factions yet.<br/><span style={{ fontSize:13 }}>Factions are organizations, guilds, and powers in your world.</span></div>
-            : <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {factions.map(f=>(
-                  <FactionCard key={f.id} faction={f} chars={chars} locations={locations} isSelected={selectedFaction?.id===f.id}
-                    onSelect={f=>updPg({ selectedFactionId: selectedFactionId===f.id?null:f.id, factionEditing: false })}/>
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const overlayRef = useRef(null);
 
-                ))}
-              </div>}
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const handler = e => { if (overlayRef.current && !overlayRef.current.contains(e.target)) setDrawerOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [drawerOpen]);
+
+  const hasFilter = !!factionQuery;
+
+  return (
+    <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0, position:"relative" }}>
+
+      {/* ── Detail: fills full height ── */}
+      <div style={{ position:"absolute", inset:0, overflowY:"auto", paddingTop:44 }}>
+        {selectedFaction
+          ? <FactionDetailPanel
+              key={selectedFaction.id}
+              faction={selectedFaction} factions={factions} chars={chars} locations={locations}
+              onClose={() => updPg({ selectedFactionId: null })}
+              onSave={onSaveFaction} onDelete={onDeleteFaction}
+              onOpenChar={onOpenChar} onSaveChar={onSaveChar}
+              onCancelNew={onCancelNew}/>
+          : <EmptyState icon="⚑" title="Select a faction" subtitle="Search above or open the filter drawer"/>
+        }
+      </div>
+
+      {/* ── Search overlay ── */}
+      <div ref={overlayRef} style={{ position:"absolute", top:0, left:0, right:0, zIndex:10, background:"#0f0c1a", borderBottom: drawerOpen ? "1px solid #2a1f3d" : "none", boxShadow: drawerOpen ? "0 8px 32px #00000099" : "0 2px 12px #00000066" }}>
+        {/* Top bar */}
+        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px" }}>
+          <div style={{ flex:1, position:"relative" }}>
+            <span style={{ position:"absolute", left:9, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:13, pointerEvents:"none" }}>🔍</span>
+            <input
+              placeholder="Search factions…"
+              value={factionQuery}
+              onChange={e => { updPg({ factionQuery: e.target.value }); if (!drawerOpen) setDrawerOpen(true); }}
+              onFocus={() => setDrawerOpen(true)}
+              style={{ ...inputStyle, paddingLeft:30, fontSize:13, width:"100%", boxSizing:"border-box" }}/>
+          </div>
+          <button onClick={() => setDrawerOpen(o => !o)}
+            style={{ display:"flex", alignItems:"center", gap:4, padding:"5px 10px", borderRadius:6, border:`1px solid ${drawerOpen||hasFilter?"#7c5cbf":"#3a2a5a"}`, background:drawerOpen||hasFilter?"#2a1a4a":"transparent", color:drawerOpen||hasFilter?"#e8d5b7":"#6a5a8a", fontSize:12, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+            List{hasFilter ? " · 1" : ""} <span style={{ fontSize:9 }}>{drawerOpen?"▲":"▼"}</span>
+          </button>
+          {hasFilter && (
+            <button onClick={() => updPg({ factionQuery: "" })}
+              style={{ padding:"4px 8px", borderRadius:6, border:"1px solid #6b1a1a", background:"transparent", color:"#c06060", fontSize:12, cursor:"pointer", flexShrink:0 }}>✕</button>
+          )}
+          <button onClick={onNewFaction} style={{ ...btnPrimary, fontSize:12, padding:"4px 10px", flexShrink:0 }}>+ New</button>
         </div>
-        <div style={{ flex:1, minWidth:0, overflowY:"auto" }}>
-          {selectedFaction
-            ? <FactionDetailPanel key={selectedFaction.id} faction={selectedFaction} factions={factions} chars={chars} locations={locations}
-                onClose={()=>updPg({ selectedFactionId: null })} onSave={onSaveFaction}
-                onDelete={onDeleteFaction} onOpenChar={onOpenChar} onSaveChar={onSaveChar}
-                onCancelNew={onCancelNew}/>
-            : <EmptyState icon="⚑" title="Select a faction to view details"/>
-          }
-        </div>
+
+        {/* Drawer */}
+        {drawerOpen && (
+          <div style={{ borderTop:"1px solid #1e1630", maxHeight:320, display:"flex", flexDirection:"column" }}>
+            <div style={{ overflowY:"auto", flex:1 }}>
+              {filteredFactions.length === 0
+                ? <div style={{ padding:"12px 16px", fontSize:12, color:"#5a4a7a" }}>No factions match.</div>
+                : filteredFactions.map(f => (
+                    <FactionRow key={f.id} faction={f} chars={chars}
+                      isSelected={selectedFactionId===f.id}
+                      onSelect={f => { updPg({ selectedFactionId: f.id, factionEditing: false }); setDrawerOpen(false); }}/>
+                  ))
+              }
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
