@@ -34,7 +34,7 @@ function FactionsTabContent({
   updPg,
   onNewFaction, onCancelNew, onSaveFaction, onDeleteFaction, onOpenChar, onSaveChar,
 }) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(!selectedFactionId);
   const overlayRef = useRef(null);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function FactionsTabContent({
           ? <FactionDetailPanel
               key={selectedFaction.id}
               faction={selectedFaction} factions={factions} chars={chars} locations={locations}
-              onClose={() => updPg({ selectedFactionId: null })}
+              onClose={() => { updPg({ selectedFactionId: null }); setDrawerOpen(true); }}
               onSave={onSaveFaction} onDelete={onDeleteFaction}
               onOpenChar={onOpenChar} onSaveChar={onSaveChar}
               onCancelNew={onCancelNew}/>
@@ -64,7 +64,7 @@ function FactionsTabContent({
       </div>
 
       {/* ── Search overlay ── */}
-      <div ref={overlayRef} style={{ position:"absolute", top:0, left:0, right:0, zIndex:10, background:"#0f0c1a", borderBottom: drawerOpen ? "1px solid #2a1f3d" : "none", boxShadow: drawerOpen ? "0 8px 32px #00000099" : "0 2px 12px #00000066" }}>
+      <div ref={overlayRef} style={{ position:"absolute", top:0, left:0, right:0, zIndex:30, background:"#0f0c1a", borderBottom: drawerOpen ? "1px solid #2a1f3d" : "none", boxShadow: drawerOpen ? "0 8px 32px #00000099" : "0 2px 12px #00000066" }}>
         {/* Top bar */}
         <div style={{ display:"flex", alignItems:"center", gap:8, padding:"7px 12px" }}>
           <div style={{ flex:1, position:"relative" }}>

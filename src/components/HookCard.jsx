@@ -68,7 +68,7 @@ function RowText({ text, onChange }) {
       onMouseEnter={e=>e.currentTarget.style.background="#ffffff08"}
       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
       {val
-        ? <span style={{ fontSize:13, color:"#b09080", lineHeight:1.7, whiteSpace:"pre-wrap" }}>{val}</span>
+        ? <span style={{ fontSize:13, color:"#b09080", lineHeight:1.7, whiteSpace:"pre-wrap", overflowWrap:"break-word", wordBreak:"break-word" }}>{val}</span>
         : <span style={{ fontSize:13, color:"#2a1f3d", fontStyle:"italic" }}>Add description…</span>
       }
     </div>
@@ -105,7 +105,9 @@ function AddEntityPicker({ onAdd, chars, factions, locations, stories, artifacts
   const [open, setOpen]     = useState(false);
   const [query, setQuery]   = useState("");
   const [cursor, setCursor] = useState(0);
+  const [dropPos, setDropPos] = useState({ top:0, right:0 });
   const inputRef = useRef();
+  const btnRef   = useRef();
 
   const isLinked = (type, id) => (existingEntities||[]).some(e => e.entityType===type && e.entityId===id);
 
@@ -144,14 +146,18 @@ function AddEntityPicker({ onAdd, chars, factions, locations, stories, artifacts
 
   return (
     <div style={{ position:"relative" }}>
-      <button onClick={()=>{ setOpen(true); setTimeout(()=>inputRef.current?.focus(),30); }}
+      <button ref={btnRef} onClick={()=>{
+          const r = btnRef.current?.getBoundingClientRect();
+          if (r) setDropPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+          setOpen(true); setTimeout(()=>inputRef.current?.focus(),30);
+        }}
         style={{ fontSize:11, color:"#5a4a7a", background:"transparent", border:"1px dashed #2a1f3d", borderRadius:6, padding:"4px 10px", cursor:"pointer", whiteSpace:"nowrap" }}
         onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#9a7fa0"; }}
         onMouseLeave={e=>{ e.currentTarget.style.borderColor="#2a1f3d"; e.currentTarget.style.color="#5a4a7a"; }}>
         ＋ entity
       </button>
       {open && (
-        <div style={{ position:"absolute", right:0, top:"calc(100% + 4px)", width:260, zIndex:50,
+        <div style={{ position:"fixed", right:dropPos.right, top:dropPos.top, width:260, zIndex:9999,
           background:"#0d0b14", border:"1px solid #3a2a5a", borderRadius:10, overflow:"hidden", boxShadow:"0 4px 24px #000000cc" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 12px", borderBottom:"1px solid #1e1630" }}>
             <span style={{ color:"#5a4a7a", fontSize:13, flexShrink:0 }}>🔍</span>
@@ -287,7 +293,6 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
     }));
   };
 
-  const allLinkedEntities = rows.flatMap(r => r.entities);
 
   return (
     <div style={{ background:"#0f0c1a", border:"1px solid #2a1f3d", borderLeft:`3px solid ${sc}`, borderRadius:10, padding:14 }}>
@@ -370,7 +375,6 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
       {/* Rows */}
       <div style={{ display:"flex", flexDirection:"column", marginBottom:8 }}>
         {rows.map((row, rowIdx) => {
-          const hasContent = row.text.trim() || row.entities.length > 0;
           return (
             <div key={row.id}
               style={{ display:"flex", alignItems:"flex-start", gap:6,
@@ -433,10 +437,10 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
                 ))}
                 <AddEntityPicker onAdd={e=>addEntityToRow(row.id, e)}
                   chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts}
-                  existingEntities={allLinkedEntities}
+                  existingEntities={row.entities}
                 />
                 {/* Remove row — shown on hover, only when multiple rows exist */}
-                {hoveredRowId===row.id && rows.length > 1 && (
+                {(hoveredRowId===row.id || confirmDeleteRowId===row.id) && rows.length > 1 && (
                   confirmDeleteRowId===row.id ? (
                     <div style={{ display:"flex", gap:4, alignItems:"center", marginTop:2 }}>
                       <button onClick={()=>{ removeRow(row.id); setConfirmDeleteRowId(null); }}
@@ -445,7 +449,7 @@ export default function HookCard({ hook, onUpdate, onRemove, onPin, isPinned, st
                         style={{ background:"transparent", color:"#9a7fa0", border:"1px solid #3a2a5a", borderRadius:5, padding:"2px 8px", cursor:"pointer", fontSize:11 }}>Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={()=>hasContent ? setConfirmDeleteRowId(row.id) : removeRow(row.id)}
+                    <button onClick={()=>setConfirmDeleteRowId(row.id)}
                       style={{ background:"none", border:"1px solid transparent", borderRadius:5, color:"#4a3a6a", cursor:"pointer", fontSize:11, padding:"2px 8px", marginTop:2, alignSelf:"flex-end" }}
                       onMouseEnter={e=>{ e.currentTarget.style.color="#c06060"; e.currentTarget.style.borderColor="#6b1a1a"; }}
                       onMouseLeave={e=>{ e.currentTarget.style.color="#4a3a6a"; e.currentTarget.style.borderColor="transparent"; }}>

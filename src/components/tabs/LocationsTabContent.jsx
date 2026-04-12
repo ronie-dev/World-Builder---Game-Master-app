@@ -30,7 +30,7 @@ function LocationsTabContent({
   onOpenChar, onOpenStory, onOpenFaction, onSaveFaction, onShowOnMap,
   locationTypes,
 }) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(!selectedLocationId);
   const overlayRef = useRef(null);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ function LocationsTabContent({
         {selectedLocation
           ? <LocationDetailPanel
               location={selectedLocation} chars={chars} factions={factions} stories={stories}
-              onClose={() => updPg({ selectedLocationId: null })}
+              onClose={() => { updPg({ selectedLocationId: null }); setDrawerOpen(true); }}
               onSave={onSaveLocation}
               onDelete={id => { onDeleteLocation(id); updPg({ selectedLocationId: null }); }}
               onOpenChar={onOpenChar} onOpenStory={onOpenStory} onOpenFaction={onOpenFaction}

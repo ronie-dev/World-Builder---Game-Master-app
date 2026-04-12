@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  isDev: () => ipcRenderer.invoke("is-dev"),
   openDataFolder: () => ipcRenderer.invoke("open-data-folder"),
   getDataPath: () => ipcRenderer.invoke("get-data-path"),
   saveWorldDialog: (json) => ipcRenderer.invoke("save-world-dialog", json),

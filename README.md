@@ -10,33 +10,36 @@ Built with **Electron + React + Vite**. All data is stored locally on your machi
 
 ---
 
-## What's New in v0.7.0
+## What's New in v0.8.0
 
-### Back Button — Panel Navigation History
-- Every panel now tracks navigation history — press **←** in the panel header to go back to your previous view
-- Works across all section changes: character → item → ← back to character, story → faction → ← back to story, etc.
+### Table Overhaul — Characters, Stories & Items
+- All three lists are now **compact filterable tables** with column-header dropdowns
+- Characters: **Name | Race | Status | Faction | Location | Type** — race visible in every row and filterable
+- Stories: **Name | Status | Player | Type** — main story pinned at top
+- Items: **Name | Rarity | Holder**
+- Filter dropdowns include a search field and only one can be open at a time
+- Opening a tab with nothing selected now immediately shows the filter drawer
 
-### Notes Split into Three Sections
-- **📝 Notes** — scratch pad only
-- **📖 Sessions** — session log with timeline linking
-- **📌 Hooks** — all GM hooks and pinned story/character hooks in a unified drag-reorderable list
+### No More Sub-Tabs — Collapsible Sections
+- Character and Story detail panels replace the tab bar with **collapsible sections** in a single scrollable view
+- Items, Hooks, Timeline, Files — all accessible without switching tabs
+- Stories gain a dedicated **🔒 Secret** section between Rewards and Factions
+- Stronger `2px` dividers between sections
 
-### Floating Search Bar — All Tabs
-- Characters, Stories, Factions, Locations, and Items all use a **floating search bar** that hovers above the detail panel — the detail fills the full height and the search closes automatically when you click away
+### Ghost Textarea Editing
+- Character Description & Secret, Story Description / Rewards / Secret, and Faction Description tabs all use **always-on ghost textareas** — click anywhere in the field, no layout jump, saves on blur
 
-### Open in Other Panel — Everywhere
-- **Ctrl+click** or **middle-click** any link (character name, story badge, faction tag, location, artifact, map pin…) to open it in the other panel — works consistently across every part of the app
+### GM Hooks Polish
+- Row delete now requires **inline confirmation** — no accidental deletions
+- Linking a hook to a story **transfers** it permanently — it becomes a pinned story hook and disappears from the GM Hooks list
 
-### Sidebar Improvements
-- Icons are **33% larger** for easier clicking
-- **Double-click** any sidebar section icon to open it directly in the right panel
-- Dragging a section onto a panel that already shows it does nothing (no accidental resets)
-
-### Lightbox Scoped to Panel
-- Zoomed portrait/image is now contained within its panel — the other panel stays fully visible
-
-### File Drop Fix
-- Dragging an image from outside the app no longer triggers the "Drop to replace this screen" overlay
+### Other Fixes & Additions
+- Relationships: inline **note field** per relationship entry
+- **+ New** always opens in the panel where it was clicked
+- Internal drag-and-drop in Faction tiers / Story groups no longer triggers cross-panel navigation
+- GM Hooks entity picker no longer clipped by scroll container
+- Gallery: search bar to filter images by name
+- Dev mode: separate data directory + red DEV badge in sidebar
 
 ---
 

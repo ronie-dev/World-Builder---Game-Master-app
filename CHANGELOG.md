@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.8.0 — Table Overhaul, Section Redesign & Editing Polish
+
+### Characters / Stories / Items — Excel-Style Table Lists
+- Character list redesigned as a compact filterable table: **Name | Race | Status | Faction | Location | Type**
+- Story list redesigned as a compact table: **Name | Status | Player | Type** — main story pinned at top, player stories grouped separately
+- Items list redesigned as a compact table: **Name | Rarity | Holder**
+- Each column header is a clickable filter dropdown; only one dropdown opens at a time; right-aligned dropdowns avoid viewport overflow
+- All filter dropdowns include a **search field** for long lists
+- Clicking a filter option no longer accidentally closes the drawer (fixed `stopPropagation`)
+- Character **Race** column visible in both the header filter and every table row
+- Character short description shown inline next to the name in the Name column
+- Player characters separated into their own labelled section above the table
+
+### Characters / Stories — Collapsible Sections (no more sub-tabs)
+- Details, Items, Hooks, Timeline, and Files are now **collapsible boxes** in a single scrollable view — no tab bar
+- Sections open/close with a toggle; sections with content default to open
+- Stories gained a dedicated **🔒 Secret** section (between Rewards and Factions)
+- Stronger `2px` dividers between all sections for clear visual separation
+
+### Ghost Textarea Editing — No Layout Jump
+- Character **Description** and **Secret** fields use always-on ghost textareas — no click-to-toggle, no layout shift
+- Story **Description**, **Rewards / Stakes**, and **Secret** fields same treatment
+- Faction **Description** tab (and all custom text tabs) same treatment
+- All fields expand automatically with content and save on blur
+
+### UX — Auto-Open Filter Drawer
+- Opening any tab with no item selected now immediately shows the filter / search drawer (Characters, Stories, Factions, Locations, Items)
+
+### GM Hooks — Row Delete Confirmation
+- Deleting a hook row now requires inline confirmation (**Delete row / Cancel**) — confirmation stays visible even after the mouse leaves the row
+
+### GM Hooks — One-Way Story Transfer
+- Linking a GM hook to a story **transfers** it permanently — removed from GM Hooks, added as a pinned story hook in the target story
+- Newly added and transferred hooks appear at the **top** of the story hook list
+
+### Relationships — Note Field
+- Each relationship entry now has a small inline note field for a short description of the relationship
+
+### + New — Opens in Current Panel
+- **+ New** in Characters, Stories, and Factions always opens the entry in the same panel where the button was clicked
+
+### Drag & Drop — Internal Drags No Longer Navigate
+- Fixed: dragging a character within Faction structure or Story groups was triggering panel navigation — internal drags now use entity-type-specific data so they don't collide with cross-panel drops
+
+### GM Hooks — Entity Picker Clipping Fix
+- Fixed: the entity search dropdown in GM Hooks was clipped by the scroll container — now uses fixed positioning based on the button's screen coordinates
+
+### Gallery — Search by Name
+- Added a search bar to the Gallery tab to filter images by name
+
+### DEV — Separate Data Directory & Indicator
+- Dev mode (`npm run electron`) uses a separate `WorldBuilder-dev` user data directory — dev and installed release can run simultaneously
+- A red **DEV** badge appears in the sidebar when running in dev mode
+
 ## v0.7.0 — Dual-Panel Navigation, Section Split & UX Polish
 
 ### Dual-Panel System — Navigation History

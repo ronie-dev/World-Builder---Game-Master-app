@@ -7,6 +7,7 @@ import PortraitZone from "./PortraitZone.jsx";
 // ── Structure Tab ─────────────────────────────────────────────────────────────
 function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveChar }) {
   const tiers = faction.tiers || [{ id:"__default__", name:"Members" }];
+  const didDragRef = useRef(false);
   const [draggedCharId, setDraggedCharId] = useState(null);
   const [dragOverTier, setDragOverTier] = useState(null);
   const [editingTierId, setEditingTierId] = useState(null);
@@ -122,9 +123,9 @@ function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveCh
             <div key={tier.id}>
               {/* Tier header / divider */}
               <div style={{ display:"flex", alignItems:"center", gap:8, margin:"10px 0 6px", borderBottom:`2px solid ${isOver?"#7c5cbf":"#3a2a5a"}`, paddingBottom:4, transition:"border-color .15s" }}
-                onDragOver={e=>{ e.preventDefault(); setDragOverTier(tier.id); }}
+                onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setDragOverTier(tier.id); }}
                 onDragLeave={()=>setDragOverTier(null)}
-                onDrop={e=>{ e.preventDefault(); if(draggedCharId) moveMember(draggedCharId, tier.id); setDraggedCharId(null); setDragOverTier(null); }}>
+                onDrop={e=>{ e.preventDefault(); e.stopPropagation(); if(draggedCharId) moveMember(draggedCharId, tier.id); setDraggedCharId(null); setDragOverTier(null); }}>
                 {editingTierId === tier.id ? (
                   <>
                     <input value={editTierName} onChange={e=>setEditTierName(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter") renameTier(tier.id); if(e.key==="Escape") setEditingTierId(null); }} autoFocus placeholder="Tier name…" style={{...inputStyle,flex:"0 0 130px",fontSize:12,padding:"3px 8px"}}/>
@@ -156,16 +157,16 @@ function StructureTab({ faction, allMembers, chars, onSave, onOpenChar, onSaveCh
               </div>
               {/* Drop zone + member cards */}
               <div style={{ display:"flex", flexWrap:"wrap", gap:8, minHeight:44, padding:"4px 0 8px", background: isOver ? "#7c5cbf0a" : "transparent", borderRadius:6, transition:"background .15s", alignItems:"center" }}
-                onDragOver={e=>{ e.preventDefault(); setDragOverTier(tier.id); }}
+                onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setDragOverTier(tier.id); }}
                 onDragLeave={()=>setDragOverTier(null)}
-                onDrop={e=>{ e.preventDefault(); if(draggedCharId) moveMember(draggedCharId, tier.id); setDraggedCharId(null); setDragOverTier(null); }}>
+                onDrop={e=>{ e.preventDefault(); e.stopPropagation(); if(draggedCharId) moveMember(draggedCharId, tier.id); setDraggedCharId(null); setDragOverTier(null); }}>
                 {tierMembers.length === 0 && !isOver && addingToTierId !== tier.id && <span style={{ color:"#3a2a5a", fontSize:12 }}>— empty —</span>}
                 {isOver && tierMembers.length === 0 && <span style={{ color:"#7c5cbf", fontSize:12 }}>Drop here</span>}
                 {tierMembers.map(c => (
                   <div key={c.id} draggable
-                    onDragStart={e=>{ e.dataTransfer.setData("application/x-wbentity", JSON.stringify({ entityType:"character", id:c.id })); setDraggedCharId(c.id); }}
-                    onDragEnd={()=>{ setDraggedCharId(null); setDragOverTier(null); }}
-                    onClick={e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);}}}
+                    onDragStart={e=>{ didDragRef.current=true; e.dataTransfer.setData("application/x-faction-member", c.id); setDraggedCharId(c.id); }}
+                    onDragEnd={()=>{ setDraggedCharId(null); setDragOverTier(null); setTimeout(()=>{ didDragRef.current=false; }, 0); }}
+                    onClick={e=>{ if(didDragRef.current) return; if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);} }}
                     onAuxClick={e=>{if(e.button===1){e.preventDefault();onOpenChar(c,{newTab:true});}}}
                     style={{ display:"flex", alignItems:"center", gap:8, background:"#1e1630", border:"1px solid #3a2a5a", borderRadius:8, padding:"6px 12px 6px 6px", cursor:"grab", userSelect:"none", transition:"border-color .15s, opacity .15s", opacity: draggedCharId===c.id ? 0.4 : 1 }}
                     onMouseEnter={e=>e.currentTarget.style.borderColor="#7c5cbf"}
@@ -236,6 +237,7 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [activeTextTab, setActiveTextTab] = useState("description");
+  const [textDraft, setTextDraft] = useState(faction.description||"");
   const [renamingTabId, setRenamingTabId] = useState(null);
   const [renameVal, setRenameVal] = useState("");
   const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
@@ -251,6 +253,11 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [editingField, confirmDelete]); // eslint-disable-line
+
+  useEffect(() => {
+    const allTabs = [{ id:"description", content:faction.description||"" }, ...(faction.textTabs||[])];
+    setTextDraft(allTabs.find(t => t.id === activeTextTab)?.content || "");
+  }, [faction.id, activeTextTab]); // eslint-disable-line
 
   if (!faction) return null;
 
@@ -436,26 +443,15 @@ function FactionDetailPanel({ faction, factions, chars, locations, onClose, onSa
             <button onClick={addTextTab} style={{ padding:"3px 10px", borderRadius:6, border:"1px dashed #3a2a5a", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}>+ Tab</button>
           </div>
           {/* Content */}
-          {editingField==="__text__"+activeTextTab
-            ? <textarea value={fieldVal} autoFocus
-                ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
-                onChange={e=>setFieldVal(e.target.value)}
-                onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
-                onBlur={()=>{ updateTextTab(activeTextTab, fieldVal); setEditingField(null); }}
-                onKeyDown={e=>{ if(e.key==="Escape") { setEditingField(null); setFieldVal(""); } }}
-                onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
-                onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
-                onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
-                style={{ ...ghostTextarea, borderColor:"transparent" }}/>
-            : <div onClick={()=>startEdit("__text__"+activeTextTab, activeTabContent)}
-                onMouseEnter={e=>{ e.currentTarget.style.background="#ffffff0a"; e.currentTarget.style.outline="1px solid #2a1f3d"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.background="transparent"; e.currentTarget.style.outline="none"; }}
-                style={{ borderRadius:4, cursor:"text", minHeight:60, padding:"4px 2px" }}>
-                {activeTabContent
-                  ? <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{activeTabContent}</div>
-                  : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add {allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…</span>}
-              </div>
-          }
+          <textarea value={textDraft}
+            ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+            onChange={e=>{ setTextDraft(e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+            onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+            onBlur={e=>{ e.target.style.borderColor="transparent"; e.target.style.background="transparent"; updateTextTab(activeTextTab, textDraft); }}
+            onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+            onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+            placeholder={`Click to add ${allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…`}
+            style={{ ...ghostTextarea, borderColor:"transparent", minHeight:60 }}/>
         </div>
 
         {/* Members / Structure */}

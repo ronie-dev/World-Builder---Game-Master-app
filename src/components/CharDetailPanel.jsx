@@ -415,10 +415,7 @@ function ItemsTab({ char, onUpdateChar, artifacts, onUpdateArtifacts, onOpenArti
   );
 }
 
-function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, subTab: subTabProp, onSubTabChange, rarities }) {
-  const [subTabInternal, setSubTabInternal] = useState("details");
-  const subTab = subTabProp ?? subTabInternal;
-  const setSubTab = onSubTabChange ?? setSubTabInternal;
+function CharDetailPanel({ char, chars, races, factions, stories, locations, loreEvents, charStatuses, hookStatuses, relationshipTypes, onClose, onDelete, onCancelNew, onOpenStory, onOpenFaction, onOpenChar, onUpdateChar, onSaveFaction, artifacts, onUpdateArtifacts, onOpenArtifact, onPinCharHook, pinnedCharHookIds, rarities }) {
   const [lightbox, setLightbox] = useState(null);
   const [activeTextTab, setActiveTextTab] = useState("biography");
   const [descExpanded, setDescExpanded] = useState(false);
@@ -434,6 +431,11 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
   const [confirmDeleteTabId, setConfirmDeleteTabId] = useState(null);
   const [sectionToggles, setSectionToggles] = useState({});
   const [confirmLinkIdx, setConfirmLinkIdx] = useState(null);
+  // Always-on draft states (no div↔textarea toggle = no layout jump)
+  const [descDraftMap, setDescDraftMap] = useState({});
+  const [secretDraft, setSecretDraft] = useState(char.secret||"");
+  useEffect(() => { setSecretDraft(char.secret||""); }, [char.id]); // eslint-disable-line
+  useEffect(() => { setDescDraftMap({}); }, [char.id]); // eslint-disable-line
 
   // Commit a single field and exit edit mode
   const commit = (field, val) => { onUpdateChar({...char, [field]: val}); setEditingField(null); };
@@ -454,6 +456,10 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
     if (k === "appearsIn") return linkedStories.length > 0;
     if (k === "relationships") return (char.relationships||[]).filter(r=>r.charId).length > 0;
     if (k === "links") return (char.links||[]).length > 0;
+    if (k === "items") return (char.items||[]).length > 0;
+    if (k === "hooks") return (char.hooks||[]).length > 0;
+    if (k === "timeline") return charEvents.length > 0;
+    if (k === "files") return (char.files||[]).length > 0;
     return true;
   };
   const toggleSection = k => setSectionToggles(t => ({...t, [k]: !isSectionOpen(k)}));
@@ -510,9 +516,10 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
   // Reusable collapsible section header
   const SectionHead = (sectionKey, label, { count=0, emptyWhen=false, labelColor=null } = {}) => (
     <div onClick={()=>toggleSection(sectionKey)}
-      style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-      onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"}
-      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+      style={{ display:"flex", alignItems:"center", gap:6, padding:"11px 24px", cursor:"pointer", userSelect:"none",
+        background:"#0d0b14", borderBottom: isSectionOpen(sectionKey) ? "1px solid #2a1f3d" : "none" }}
+      onMouseEnter={e=>e.currentTarget.style.background="#110e1c"}
+      onMouseLeave={e=>e.currentTarget.style.background="#0d0b14"}>
       <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen(sectionKey)?"▼":"▶"}</span>
       <span style={{...LABEL, marginBottom:0, ...(labelColor ? {color:labelColor} : {})}}>{label}</span>
       {count > 0 && <span style={{ fontSize:10, color:"#5a4a7a", marginLeft:4 }}>({count})</span>}
@@ -523,9 +530,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
   // Bio/custom tab helpers
   const allTextTabs = [{id:"biography", name:isPlayer?"Biography":"Description", content:char.description||""}, ...(char.textTabs||[])];
   const activeTabContent = allTextTabs.find(t=>t.id===activeTextTab)?.content || "";
-  const PREVIEW = 500;
-  const needsFold = activeTabContent.length > PREVIEW;
-  const visibleText = needsFold && !descExpanded ? activeTabContent.slice(0,PREVIEW).trimEnd()+"…" : activeTabContent;
+  const visibleText = activeTabContent;
 
   const updateTextTab = (tabId, content) => {
     if (tabId==="biography") onUpdateChar({...char, description:content});
@@ -809,24 +814,13 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
 
       </div>{/* ── end header ── */}
 
-      {/* ── Sub-tabs ── */}
-      <div style={{ display:"flex", borderBottom:"1px solid #2a1f3d", background:"#0f0c1a" }}>
-        {[["details","📋 Details",0],["items","🎒 Items",(char.items||[]).length],["timeline","⏳ Timeline",charEvents.length],["hooks","🔮 Hooks",(char.hooks||[]).length],["files","📁 Files",(char.files||[]).length]].map(([key,label,count])=>(
-          <button key={key} onClick={()=>setSubTab(key)}
-            style={{ padding:"10px 24px", border:"none", background:"transparent", color:subTab===key?"#e8d5b7":"#5a4a7a", cursor:"pointer", fontSize:13, fontWeight:subTab===key?700:400, borderBottom:subTab===key?"2px solid #7c5cbf":"2px solid transparent", letterSpacing:.5 }}>
-            {label}{count>0&&<span style={{ marginLeft:6, background:"#7c5cbf", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:10 }}>{count}</span>}
-          </button>
-        ))}
-      </div>
-
       </div>{/* ── end sticky wrapper ── */}
 
-      {/* ── Details tab ── */}
-      {subTab==="details" && (
-        <div style={{ display:"flex", flexWrap:"wrap" }}>
+      {/* ── Details ── */}
+      <div style={{ display:"flex", flexWrap:"wrap" }}>
 
           {/* Biography / Custom Text Tabs */}
-          <div style={{ flex:"1 1 100%", padding:"14px 24px", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 100%", padding:"14px 24px", borderBottom:"1px solid #2a1f3d" }}>
             {/* Tab bar */}
             <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:10, flexWrap:"wrap" }}>
               {allTextTabs.map(t=>(
@@ -858,59 +852,42 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
               ))}
               <button onClick={addTextTab} style={{ padding:"3px 10px", borderRadius:6, border:"1px dashed #3a2a5a", background:"transparent", color:"#5a4a7a", cursor:"pointer", fontSize:11 }}>+ Tab</button>
             </div>
-            {/* Content — click text to edit, textarea on click */}
-            {editingField==="__text__"+activeTextTab
-              ? <textarea value={fieldVal} autoFocus
-                  ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
-                  onChange={e=>setFieldVal(e.target.value)}
-                  onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
-                  onBlur={()=>{ updateTextTab(activeTextTab, fieldVal); setEditingField(null); }}
-                  onKeyDown={e=>{ if(e.key==="Escape") { setEditingField(null); setFieldVal(""); } }}
-                  style={ghostTextarea}/>
-              : <div onClick={()=>startEdit("__text__"+activeTextTab, activeTabContent)} {...fh}
-                  style={{ borderRadius:4, cursor:"text", minHeight:40, padding:"4px 2px" }}>
-                  {activeTabContent
-                    ? <>
-                        <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{visibleText}</div>
-                        {needsFold&&<button onClick={e=>{ e.stopPropagation(); setDescExpanded(v=>!v); }}
-                          style={{ marginTop:8, background:"transparent", border:"1px solid #3a2a5a", borderRadius:6, padding:"3px 12px", color:"#7c5cbf", cursor:"pointer", fontSize:12 }}
-                          onMouseEnter={e=>{ e.currentTarget.style.borderColor="#7c5cbf"; e.currentTarget.style.color="#c8a96e"; }}
-                          onMouseLeave={e=>{ e.currentTarget.style.borderColor="#3a2a5a"; e.currentTarget.style.color="#7c5cbf"; }}>
-                          {descExpanded?"▲ Show less":"▼ Show more"}
-                        </button>}
-                      </>
-                    : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add {allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…</span>}
-                </div>
-            }
+            {/* Content — always-on textarea, no layout jump */}
+            {(()=>{ const draft = descDraftMap[activeTextTab] ?? activeTabContent; return (
+              <textarea value={draft}
+                ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                onChange={e=>{ const v=e.target.value; setDescDraftMap(m=>({...m,[activeTextTab]:v})); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+                onBlur={e=>{ e.target.style.borderColor="transparent"; e.target.style.background="transparent"; updateTextTab(activeTextTab, descDraftMap[activeTextTab]??activeTabContent); setDescDraftMap(m=>({...m,[activeTextTab]:undefined})); }}
+                onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+                onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+                placeholder={`Add ${allTextTabs.find(t=>t.id===activeTextTab)?.name||"text"}…`}
+                style={{ ...ghostTextarea, borderColor:"transparent", minHeight:40 }}/>
+            ); })()}
           </div>
 
           {/* Secret (main only) */}
           {char.type==="main" && (
-            <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630", background:"#0d0a18" }}>
+            <div style={{ flex:"1 1 100%", borderBottom:"1px solid #2a1f3d", background:"#0d0a18" }}>
               {SectionHead("secret", "🔒 Secret", { emptyWhen:!char.secret, labelColor:"#7c3a7a" })}
               {isSectionOpen("secret") && (
                 <div style={{ padding:"0 24px 14px" }}>
-                  {editingField==="secret"
-                    ? <textarea value={fieldVal} autoFocus
-                        ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
-                        onChange={e=>setFieldVal(e.target.value)}
-                        onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
-                        onBlur={()=>commit("secret",fieldVal)}
-                        onKeyDown={e=>{ if(e.key==="Escape") cancelEdit(); }}
-                        style={{...ghostTextarea,color:"#a07898"}}/>
-                    : <div onClick={()=>startEdit("secret",char.secret||"")} {...fh} style={{ borderRadius:4, cursor:"text", padding:"2px 0" }}>
-                        {char.secret
-                          ? <div style={{ color:"#a07898", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{char.secret}</div>
-                          : <span style={{ color:"#4a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add secret notes…</span>}
-                      </div>
-                  }
+                  <textarea value={secretDraft}
+                    ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                    onChange={e=>{ setSecretDraft(e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                    onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+                    onBlur={e=>{ e.target.style.borderColor="transparent"; e.target.style.background="transparent"; onUpdateChar({...char, secret:secretDraft}); }}
+                    onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+                    onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+                    placeholder="Click to add secret notes…"
+                    style={{ ...ghostTextarea, color:"#a07898", borderColor:"transparent", minHeight:40 }}/>
                 </div>
               )}
             </div>
           )}
 
           {/* Factions */}
-          <div style={{ flex:"1 1 50%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 50%", borderRight:"1px solid #2a1f3d", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("factions", "⚑ Factions", { count:factionCount, emptyWhen:!factionCount })}
             {isSectionOpen("factions") && (
               <div style={{ padding:"0 24px 14px" }}>
@@ -923,7 +900,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
           </div>
 
           {/* Appears In */}
-          <div style={{ flex:"1 1 50%", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 50%", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("appearsIn", "📜 Appears In", { count:linkedStories.length, emptyWhen:!linkedStories.length })}
             {isSectionOpen("appearsIn") && (
               <div style={{ padding:"0 24px 14px" }}>
@@ -946,7 +923,7 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
           </div>
 
           {/* Relationships */}
-          <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 100%", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("relationships", "🔗 Relationships", { count:relCount, emptyWhen:!relCount })}
             {isSectionOpen("relationships") && (
               <div style={{ padding:"0 24px 14px" }}>
@@ -963,11 +940,11 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
                 {(char.links||[]).map((lnk,i)=>(
                   <div key={lnk.id} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
                     {editingField===`link-${lnk.id}`
-                      ? <>
+                      ? <div style={{ display:"contents" }} onBlur={e=>{ if(!e.currentTarget.contains(e.relatedTarget)) setEditingField(null); }}>
                           <input value={lnk.label} onChange={e=>{ const l=[...(char.links||[])]; l[i]={...l[i],label:e.target.value}; updateLinks(l); }} placeholder="Label" style={{...inputStyle,flex:"0 0 130px"}}/>
                           <input autoFocus value={lnk.url} onChange={e=>{ const l=[...(char.links||[])]; l[i]={...l[i],url:e.target.value}; updateLinks(l); }} placeholder="https://..." style={{...inputStyle,flex:1}}
-                            onBlur={()=>setEditingField(null)} onKeyDown={e=>{ if(e.key==="Escape"||e.key==="Enter") setEditingField(null); }}/>
-                        </>
+                            onKeyDown={e=>{ if(e.key==="Escape"||e.key==="Enter") setEditingField(null); }}/>
+                        </div>
                       : <>
                           <a href={lnk.url} target="_blank" rel="noreferrer"
                             style={{ flex:1, fontSize:13, color:"#c8a96e", textDecoration:"none", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
@@ -993,20 +970,40 @@ function CharDetailPanel({ char, chars, races, factions, stories, locations, lor
             )}
           </div>
 
-        </div>
-      )}
+      </div>
 
-      {subTab==="items" && <ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact} rarities={rarities}/>}
-      {subTab==="timeline" && (
-        <div style={{ padding:"20px 24px" }}>
-          {charEvents.length===0
-            ? <div style={{ textAlign:"center", padding:"40px 0", color:"#5a4a7a" }}><div style={{ fontSize:36, marginBottom:10 }}>⏳</div><div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>No events linked to this character.</div></div>
-            : <CharTimeline evGroupMap={evGroupMap} evGroupOrder={evGroupOrder} evUndated={evUndated} stories={stories} onOpenStory={onOpenStory}/>
-          }
+      {/* ── Items ── */}
+      <div style={{ borderTop:"2px solid #2a1f3d" }}>
+        {SectionHead("items", "🎒 Items", { count:(char.items||[]).length, emptyWhen:!(char.items||[]).length })}
+        {isSectionOpen("items") && <ItemsTab char={char} onUpdateChar={onUpdateChar} artifacts={artifacts||[]} onUpdateArtifacts={onUpdateArtifacts} onOpenArtifact={onOpenArtifact} rarities={rarities}/>}
+      </div>
+
+      {/* ── Hooks ── */}
+      <div style={{ borderTop:"2px solid #2a1f3d" }}>
+        {SectionHead("hooks", "🔮 Hooks", { count:(char.hooks||[]).length, emptyWhen:!(char.hooks||[]).length })}
+        {isSectionOpen("hooks") && <CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds} chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}/>}
+      </div>
+
+      {/* ── Timeline ── */}
+      <div style={{ borderTop:"2px solid #2a1f3d" }}>
+        {SectionHead("timeline", "⏳ Timeline", { count:charEvents.length, emptyWhen:!charEvents.length })}
+        {isSectionOpen("timeline") && (
+          <div style={{ padding:"8px 24px 20px" }}>
+            {charEvents.length===0
+              ? <div style={{ textAlign:"center", padding:"30px 0", color:"#5a4a7a" }}><div style={{ fontSize:36, marginBottom:10 }}>⏳</div><div style={{ fontSize:14, fontFamily:"Georgia,serif" }}>No events linked to this character.</div></div>
+              : <CharTimeline evGroupMap={evGroupMap} evGroupOrder={evGroupOrder} evUndated={evUndated} stories={stories} onOpenStory={onOpenStory}/>
+            }
+          </div>
+        )}
+      </div>
+
+      {/* ── Files ── */}
+      {onUpdateChar && (
+        <div style={{ borderTop:"2px solid #2a1f3d" }}>
+          {SectionHead("files", "📁 Files", { count:(char.files||[]).length, emptyWhen:!(char.files||[]).length })}
+          {isSectionOpen("files") && <FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
         </div>
       )}
-      {subTab==="hooks" && <CharHooksTab char={char} onUpdateChar={onUpdateChar} hookStatuses={hookStatuses} onPinHook={onPinCharHook} pinnedHookIds={pinnedCharHookIds} chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}/>}
-      {subTab==="files" && onUpdateChar && <FilesPanel char={char} onUpdateChar={onUpdateChar}/>}
     </div>
   );
 }

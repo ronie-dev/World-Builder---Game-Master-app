@@ -15,13 +15,17 @@ function GalleryTabContent({ images, galleryEntries, onUpdateEntries }) {
   const [uploadLabel, setUploadLabel] = useState("");
   const [uploadType, setUploadType] = useState("Other");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [search, setSearch] = useState("");
 
   // Merge: custom entries first (with _custom flag), then auto-collected
   const allImages = [
     ...(galleryEntries||[]).map(e => ({...e, _custom:true})),
     ...images,
   ];
-  const filtered = filter === "All" ? allImages : allImages.filter(i => i.type === filter);
+  const filtered = allImages.filter(i =>
+    (filter === "All" || i.type === filter) &&
+    (!search || (i.label||"").toLowerCase().includes(search.toLowerCase()))
+  );
 
   const handleUpload = () => {
     if (!uploadSrc) return;
@@ -82,6 +86,20 @@ function GalleryTabContent({ images, galleryEntries, onUpdateEntries }) {
           </div>
         </div>
       )}
+
+      {/* Search */}
+      <div style={{ position:"relative", marginBottom:12 }}>
+        <span style={{ position:"absolute", left:9, top:"50%", transform:"translateY(-50%)", color:"#5a4a7a", fontSize:13, pointerEvents:"none" }}>🔍</span>
+        <input
+          placeholder="Search by name…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ ...inputStyle, paddingLeft:30, fontSize:13, width:"100%", boxSizing:"border-box" }}/>
+        {search && (
+          <button onClick={() => setSearch("")}
+            style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#6a5a8a", fontSize:16, cursor:"pointer", lineHeight:1, padding:0 }}>✕</button>
+        )}
+      </div>
 
       {/* Type filters */}
       <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:18 }}>

@@ -180,7 +180,7 @@ function DeityDetailPanel({ deity, factions, locations, onSave, onDelete, onCanc
               <input value={locSearch} onChange={e => setLocSearch(e.target.value)} placeholder="Search locations to link…"
                 style={{ ...ghostInput, fontSize: 12, display: "block", width: "100%", padding: "5px 8px", boxSizing: "border-box" }}/>
               {locSearch && availLocs.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#1a1228", border: "1px solid #3a2a5a", borderRadius: 6, zIndex: 10, maxHeight: 160, overflowY: "auto" }}>
+                <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "#1a1228", border: "1px solid #3a2a5a", borderRadius: 6, zIndex: 10, maxHeight: 160, overflowY: "auto", marginBottom: 4 }}>
                   {availLocs.slice(0, 8).map(l => (
                     <div key={l.id} onClick={() => { const next = { ...form, locationIds: [...activeIds, l.id] }; setForm(next); commit(next); setLocSearch(""); }}
                       style={{ padding: "7px 12px", cursor: "pointer", fontSize: 13, color: "#c8b8e8", borderBottom: "1px solid #2a1f3d" }}
@@ -210,7 +210,7 @@ function DeityDetailPanel({ deity, factions, locations, onSave, onDelete, onCanc
               <input value={facSearch} onChange={e => setFacSearch(e.target.value)} placeholder="Search factions to link…"
                 style={{ ...ghostInput, fontSize: 12, display: "block", width: "100%", padding: "5px 8px", boxSizing: "border-box" }}/>
               {facSearch && availFacs.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#1a1228", border: "1px solid #3a2a5a", borderRadius: 6, zIndex: 10, maxHeight: 160, overflowY: "auto" }}>
+                <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "#1a1228", border: "1px solid #3a2a5a", borderRadius: 6, zIndex: 10, maxHeight: 160, overflowY: "auto", marginBottom: 4 }}>
                   {availFacs.slice(0, 8).map(f => (
                     <div key={f.id} onClick={() => { const next = { ...form, factionIds: [...activeFIds, f.id] }; setForm(next); commit(next); setFacSearch(""); }}
                       style={{ padding: "7px 12px", cursor: "pointer", fontSize: 13, color: "#c8b8e8", borderBottom: "1px solid #2a1f3d" }}

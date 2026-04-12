@@ -2,27 +2,6 @@ import { useState, useRef, memo } from "react";
 import { uid } from "../../utils.jsx";
 import HookCard from "../HookCard.jsx";
 
-// ── Hook preview (rows model, with legacy fallback) ───────────────────────────
-const _EI = { character:"👤", faction:"⚑", location:"📍", story:"📜", artifact:"⚗️" };
-function HookBlocksPreview({ hook }) {
-  const rows = hook.rows
-    || (hook.blocks ? hook.blocks.filter(b=>b.type==="text").map(b=>({ text:b.content, entities:[] })) : null)
-    || (hook.description ? [{ text:hook.description, entities:[] }] : []);
-  if (!rows.length) return null;
-  return (
-    <div style={{ marginBottom:8 }}>
-      {rows.slice(0,3).map((r,i) => (
-        <div key={i}>
-          {r.text && <div style={{ fontSize:12, color:"#9a8272", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{r.text}</div>}
-          {(r.entities||[]).slice(0,3).map((e,j) =>
-            <span key={j} style={{ display:"inline-flex", alignItems:"center", gap:3, background:"#1a1230", border:"1px solid #3a2a5a", borderRadius:10, padding:"1px 7px 1px 5px", fontSize:11, color:"#c8b89a", marginRight:4, marginBottom:2 }}>{_EI[e.entityType]} {e.name}</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 function HooksTabContent({ notes, setNotes, chars, factions, locations, stories, setStories, artifacts, hookStatuses, onOpenStory, onOpenChar, onPinHook, onPinCharHook, onUpdateStory, onUpdateChar }) {
   const dragItemRef = useRef(null);
@@ -50,9 +29,10 @@ function HooksTabContent({ notes, setNotes, chars, factions, locations, stories,
 
   const removeGmHook = id => {
     const hook = (notes.hooks||[]).find(h => h.id === id);
+    // If linked: keep a standalone copy in the story (strip linkedStoryId), just remove from GM hooks
     if (hook?.linkedStoryId) {
       setStories(prev => prev.map(st => st.id === hook.linkedStoryId
-        ? { ...st, hooks: (st.hooks||[]).filter(h => h.id !== id) }
+        ? { ...st, hooks: (st.hooks||[]).map(h => h.id === id ? { ...h, linkedStoryId: null } : h) }
         : st
       ));
     }
@@ -60,25 +40,20 @@ function HooksTabContent({ notes, setNotes, chars, factions, locations, stories,
   };
 
   const linkGmHookStory = (hookId, storyId) => {
-    const hook = (notes.hooks||[]).find(h => h.id === hookId);
-    setNotes(n => ({ ...n, hooks: (n.hooks||[]).map(h => h.id===hookId ? {...h, linkedStoryId:storyId} : h) }));
-    if (hook) {
+    // Transfer: move hook to story.hooks (as proper story hook), remove from GM hooks
+    setNotes(n => {
+      const hook = (n.hooks||[]).find(h => h.id === hookId);
+      if (!hook) return n;
+      const storyHook = { ...hook };
+      delete storyHook.linkedStoryId;
       setStories(prev => prev.map(st => st.id === storyId
-        ? { ...st, hooks: [...(st.hooks||[]).filter(h => h.id !== hookId), {...hook, linkedStoryId:storyId}] }
+        ? { ...st, hooks: [storyHook, ...(st.hooks||[]).filter(h => h.id !== hookId)] }
         : st
       ));
-    }
-  };
-
-  const unlinkGmHookStory = hookId => {
-    const hook = (notes.hooks||[]).find(h => h.id === hookId);
-    if (hook?.linkedStoryId) {
-      setStories(prev => prev.map(st => st.id === hook.linkedStoryId
-        ? { ...st, hooks: (st.hooks||[]).filter(h => h.id !== hookId) }
-        : st
-      ));
-    }
-    setNotes(n => ({ ...n, hooks: (n.hooks||[]).map(h => h.id===hookId ? {...h, linkedStoryId:null} : h) }));
+      const alreadyPinned = (n.pins||[]).some(p => p.hookPin && p.storyId === storyId && p.hookId === hookId);
+      const pins = alreadyPinned ? (n.pins||[]) : [{ id: uid(), hookPin: true, storyId, hookId }, ...(n.pins||[])];
+      return { ...n, hooks: n.hooks.filter(h => h.id !== hookId), pins };
+    });
   };
 
   // Unified hook list order (GM hooks + pinned)
@@ -164,7 +139,6 @@ function HooksTabContent({ notes, setNotes, chars, factions, locations, stories,
                           statuses={gmHookStatuses} colorMap={gmColorMap}
                           chars={chars} factions={factions} locations={locations} stories={stories} artifacts={artifacts||[]}
                           onLinkStory={storyId => linkGmHookStory(h.id, storyId)}
-                          onUnlinkStory={() => unlinkGmHookStory(h.id)}
                           onOpenLinkedStory={(s, opts={}) => onOpenStory(s, null, { storySubTab:"hooks", ...opts })}
                         />
                       </div>

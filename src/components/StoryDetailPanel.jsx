@@ -191,12 +191,9 @@ function LootTab({ story, onUpdateStory, artifacts, chars, onOpenChar, onOpenArt
   );
 }
 
-function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, subTab: subTabProp, onSubTabChange, storyStatuses, hookStatuses, onPinHook, pinnedHookIds, rarities }) {
+function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete, onSetMain, onSetPlayerStory, onOpenChar, onOpenFaction, onOpenLocation, onUpdateStory, onAskConfirm, onCloseConfirm, artifacts, onOpenArtifact, currentTimelineDate, highlightEventId, onHighlightClear, storyStatuses, hookStatuses, onPinHook, pinnedHookIds, rarities }) {
   const storyStatusList = storyStatuses || DEFAULT_STORY_STATUSES;
   const storyColorMap = Object.fromEntries(storyStatusList.map(s => [s.name, s.color]));
-  const [subTabInternal, setSubTabInternal] = useState("details");
-  const subTab = subTabProp ?? subTabInternal;
-  const setSubTab = onSubTabChange ?? setSubTabInternal;
   const [playerPicker, setPlayerPicker] = useState(false);
   const [editingField, setEditingField] = useState(null);
   const [fieldVal, setFieldVal] = useState("");
@@ -218,8 +215,13 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
   const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState(null);
   const [confirmRemoveFacId, setConfirmRemoveFacId] = useState(null);
   const [confirmRemoveLocId, setConfirmRemoveLocId] = useState(null);
+  // Always-on draft states (no div↔textarea toggle = no layout jump)
+  const [descDraft, setDescDraft] = useState(story.description||"");
+  const [rewardsDraft, setRewardsDraft] = useState(story.rewards||"");
+  const [secretDraft, setSecretDraft] = useState(story.secret||"");
+  useEffect(() => { setDescDraft(story.description||""); setRewardsDraft(story.rewards||""); setSecretDraft(story.secret||""); }, [story.id]); // eslint-disable-line
 
-  useEffect(() => { if (highlightEventId) setSubTab("timeline"); }, [highlightEventId, setSubTab]);
+  useEffect(() => { if (highlightEventId) setSectionToggles(t => ({...t, timeline: true})); }, [highlightEventId]);
   useEffect(() => {
     const handler = e => {
       if (e.key !== "Escape") return;
@@ -332,16 +334,21 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
     if (k === "characters") return (story.characterIds||[]).length > 0;
     if (k === "sideChars") return false;
     if (k === "description") return !!story.description;
+    if (k === "secret") return !!story.secret;
     if (k === "rewards") return !!story.rewards;
     if (k === "factions") return (story.factionIds||[]).length > 0;
     if (k === "locations") return (story.locationIds||[]).length > 0;
+    if (k === "items") return (story.loot||[]).length > 0;
+    if (k === "hooks") return (story.hooks||[]).length > 0;
+    if (k === "timeline") return events.length > 0;
     return true;
   };
   const toggleSection = k => setSectionToggles(t => ({...t, [k]: !isSectionOpen(k)}));
 
   const SectionHead = (key, label, { count, showEmpty } = {}) => (
-    <div onClick={()=>toggleSection(key)} style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 24px", cursor:"pointer", userSelect:"none" }}
-      onMouseEnter={e=>e.currentTarget.style.background="#ffffff07"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+    <div onClick={()=>toggleSection(key)} style={{ display:"flex", alignItems:"center", gap:6, padding:"11px 24px", cursor:"pointer", userSelect:"none",
+      background:"#0d0b14", borderBottom: isSectionOpen(key) ? "1px solid #2a1f3d" : "none" }}
+      onMouseEnter={e=>e.currentTarget.style.background="#110e1c"} onMouseLeave={e=>e.currentTarget.style.background="#0d0b14"}>
       <span style={{ fontSize:10, color:"#5a4a7a" }}>{isSectionOpen(key)?"▼":"▶"}</span>
       <span style={{...LABEL, marginBottom:0}}>{label}</span>
       {count != null && count > 0 && <span style={{ fontSize:11, color:"#5a4a7a", marginLeft:4 }}>({count})</span>}
@@ -393,9 +400,9 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
             {story.playerId && <span style={{ fontSize:11, color:"#7c5cbf", background:"#7c5cbf22", borderRadius:4, padding:"2px 8px" }}>🎲 {chars.find(c=>c.id===story.playerId)?.name||"Player Story"}</span>}
           </div>
           <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
-            {linkedChars.length > 0 && <span onClick={()=>setSubTab("details")} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8b89a", background:"#c8b89a18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8b89a33", cursor:"pointer" }}>👥 {linkedChars.length} char{linkedChars.length!==1?"s":""}</span>}
-            {events.length > 0 && <span onClick={()=>setSubTab("timeline")} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#7c9abf", background:"#7c9abf18", borderRadius:8, padding:"1px 7px", border:"1px solid #7c9abf33", cursor:"pointer" }}>⏳ {events.length} event{events.length!==1?"s":""}</span>}
-            {(story.hooks||[]).filter(h=>h.status==="Active").length > 0 && <span onClick={()=>setSubTab("hooks")} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8a96e", background:"#c8a96e18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8a96e44", cursor:"pointer" }}>🔮 {(story.hooks||[]).filter(h=>h.status==="Active").length} active hook{(story.hooks||[]).filter(h=>h.status==="Active").length!==1?"s":""}</span>}
+            {linkedChars.length > 0 && <span onClick={()=>setSectionToggles(t=>({...t,characters:true}))} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8b89a", background:"#c8b89a18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8b89a33", cursor:"pointer" }}>👥 {linkedChars.length} char{linkedChars.length!==1?"s":""}</span>}
+            {events.length > 0 && <span onClick={()=>setSectionToggles(t=>({...t,timeline:true}))} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#7c9abf", background:"#7c9abf18", borderRadius:8, padding:"1px 7px", border:"1px solid #7c9abf33", cursor:"pointer" }}>⏳ {events.length} event{events.length!==1?"s":""}</span>}
+            {(story.hooks||[]).filter(h=>h.status==="Active").length > 0 && <span onClick={()=>setSectionToggles(t=>({...t,hooks:true}))} style={{ display:"inline-flex", alignItems:"center", gap:3, fontSize:10, color:"#c8a96e", background:"#c8a96e18", borderRadius:8, padding:"1px 7px", border:"1px solid #c8a96e44", cursor:"pointer" }}>🔮 {(story.hooks||[]).filter(h=>h.status==="Active").length} active hook{(story.hooks||[]).filter(h=>h.status==="Active").length!==1?"s":""}</span>}
           </div>
         </div>
 
@@ -434,21 +441,13 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
         </div>
       </div>
 
-      {/* ── Sub-tabs ── */}
-      <div style={{ display:"flex", gap:8, padding:"12px 24px", borderBottom:"1px solid #1e1630", background:"#0f0c1a" }}>
-        {[["details","📖 Details"],["items","🎒 Items"],["timeline","⏳ Timeline"],["hooks","🔮 Hooks"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setSubTab(id)} style={{ background:subTab===id?"#7c5cbf":"transparent", border:`1px solid ${subTab===id?"#7c5cbf":"#3a2a5a"}`, borderRadius:6, color:subTab===id?"#fff":"#9a7fa0", fontSize:12, fontWeight:600, padding:"5px 16px", cursor:"pointer", transition:"all .15s" }}>{label}</button>
-        ))}
-      </div>
-
       </div>{/* end sticky wrapper */}
 
-      {/* ── Details tab ── */}
-      {subTab==="details" && (
-        <div style={{ display:"flex", flexWrap:"wrap" }}>
+      {/* ── Details ── */}
+      <div style={{ display:"flex", flexWrap:"wrap" }}>
 
           {/* Characters — user-defined groups */}
-          <div style={{ flex:"1 1 100%", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 100%", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("characters", "👥 Characters", { count: linkedChars.length, showEmpty: linkedChars.length === 0 })}
             {isSectionOpen("characters") && <div style={{ padding:"0 24px 14px" }}>
 
@@ -503,7 +502,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                         {groupChars.map(c => (
                           <div key={c.id}
                             draggable
-                            onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("application/x-wbentity", JSON.stringify({ entityType:"character", id:c.id })); setDragCharId(c.id); }}
+                            onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("application/x-story-member", c.id); setDragCharId(c.id); }}
                             onDragEnd={()=>{ setDragCharId(null); setDragOverGroupId(null); }}
                             style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 8px", cursor:"grab", opacity: dragCharId===c.id ? 0.4 : 1, transition:"opacity .1s", maxWidth:220, minWidth:0 }}>
                             <Avatar src={c.image} name={c.name} size={26}/>
@@ -571,7 +570,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
                       {linkedChars.filter(c=>!charGroupAssignments[c.id]).map(c=>(
                         <div key={c.id}
                           draggable
-                          onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("application/x-wbentity", JSON.stringify({ entityType:"character", id:c.id })); setDragCharId(c.id); }}
+                          onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("application/x-story-member", c.id); setDragCharId(c.id); }}
                           onDragEnd={()=>{ setDragCharId(null); setDragOverGroupId(null); }}
                           style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"5px 8px", cursor:"grab", opacity: dragCharId===c.id ? 0.4 : 1, transition:"opacity .1s", maxWidth:220, minWidth:0 }}>
                           <Avatar src={c.image} name={c.name} size={26}/>
@@ -613,49 +612,55 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
           </div>
 
           {/* Description */}
-          <div style={{ flex:"1 1 55%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 55%", borderRight:"1px solid #2a1f3d", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("description", "📖 Description", { showEmpty: !story.description })}
             {isSectionOpen("description") && <div style={{ padding:"0 24px 14px" }}>
-              {editingField==="description"
-                ? <textarea value={fieldVal} autoFocus
-                    ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
-                    onChange={e=>setFieldVal(e.target.value)}
-                    onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
-                    onBlur={()=>commit("description",fieldVal)}
-                    onKeyDown={e=>{ if(e.key==="Escape") commit("description",fieldVal); }}
-                    style={ghostTextarea}/>
-                : <div onClick={()=>startEdit("description",story.description||"")} {...fh} style={{ borderRadius:4, cursor:"text", minHeight:60, padding:"4px 2px" }}>
-                    {story.description
-                      ? <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{story.description}</div>
-                      : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add description…</span>}
-                  </div>
-              }
+              <textarea value={descDraft}
+                ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                onChange={e=>{ setDescDraft(e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+                onBlur={e=>{ e.target.style.borderColor="transparent"; e.target.style.background="transparent"; commit("description", descDraft); }}
+                onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+                onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+                placeholder="Click to add description…"
+                style={{ ...ghostTextarea, borderColor:"transparent", minHeight:60 }}/>
             </div>}
           </div>
 
           {/* Rewards / Stakes */}
-          <div style={{ flex:"1 1 35%", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 35%", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("rewards", "⚖️ Rewards / Stakes", { showEmpty: !story.rewards })}
             {isSectionOpen("rewards") && <div style={{ padding:"0 24px 14px" }}>
-              {editingField==="rewards"
-                ? <textarea value={fieldVal} autoFocus
-                    ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
-                    onChange={e=>setFieldVal(e.target.value)}
-                    onInput={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
-                    onBlur={()=>commit("rewards",fieldVal)}
-                    onKeyDown={e=>{ if(e.key==="Escape") commit("rewards",fieldVal); }}
-                    style={ghostTextarea}/>
-                : <div onClick={()=>startEdit("rewards",story.rewards||"")} {...fh} style={{ borderRadius:4, cursor:"text", minHeight:60, padding:"4px 2px" }}>
-                    {story.rewards
-                      ? <div style={{ color:"#b09080", fontSize:14, lineHeight:1.7, whiteSpace:"pre-wrap" }}>{story.rewards}</div>
-                      : <span style={{ color:"#3a2a5a", fontSize:13, fontStyle:"italic" }}>Click to add rewards/stakes…</span>}
-                  </div>
-              }
+              <textarea value={rewardsDraft}
+                ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                onChange={e=>{ setRewardsDraft(e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+                onBlur={e=>{ e.target.style.borderColor="transparent"; e.target.style.background="transparent"; commit("rewards", rewardsDraft); }}
+                onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+                onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+                placeholder="Click to add rewards/stakes…"
+                style={{ ...ghostTextarea, borderColor:"transparent", minHeight:60 }}/>
+            </div>}
+          </div>
+
+          {/* Secret */}
+          <div style={{ flex:"1 1 100%", borderBottom:"1px solid #2a1f3d", background:"#0d0a18" }}>
+            {SectionHead("secret", "🔒 Secret", { showEmpty: !story.secret })}
+            {isSectionOpen("secret") && <div style={{ padding:"0 24px 14px" }}>
+              <textarea value={secretDraft}
+                ref={el=>{ if(el){ el.style.height="auto"; el.style.height=el.scrollHeight+"px"; } }}
+                onChange={e=>{ setSecretDraft(e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }}
+                onFocus={e=>{ e.target.style.borderColor="#3a2a5a"; e.target.style.background="transparent"; }}
+                onBlur={e=>{ e.target.style.borderColor="transparent"; e.target.style.background="transparent"; commit("secret", secretDraft); }}
+                onMouseEnter={e=>{ if(document.activeElement!==e.target) e.target.style.background="#ffffff0a"; }}
+                onMouseLeave={e=>{ if(document.activeElement!==e.target) e.target.style.background="transparent"; }}
+                placeholder="Click to add secret notes…"
+                style={{ ...ghostTextarea, color:"#a07898", borderColor:"transparent", minHeight:40 }}/>
             </div>}
           </div>
 
           {/* Factions */}
-          <div style={{ flex:"1 1 50%", borderRight:"1px solid #1e1630", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 50%", borderRight:"1px solid #2a1f3d", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("factions", "⚑ Factions Involved", { count: (story.factionIds||[]).length, showEmpty: (story.factionIds||[]).length === 0 })}
             {isSectionOpen("factions") && <div style={{ padding:"0 24px 14px" }}>
               {(story.factionIds||[]).length > 0 && (
@@ -704,7 +709,7 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
           </div>
 
           {/* Locations */}
-          <div style={{ flex:"1 1 50%", borderBottom:"1px solid #1e1630" }}>
+          <div style={{ flex:"1 1 50%", borderBottom:"1px solid #2a1f3d" }}>
             {SectionHead("locations", "📍 Locations", { count: (story.locationIds||[]).length, showEmpty: (story.locationIds||[]).length === 0 })}
             {isSectionOpen("locations") && <div style={{ padding:"0 24px 14px" }}>
               {(story.locationIds||[]).length > 0 && (
@@ -752,19 +757,32 @@ function StoryDetailPanel({ story, chars, factions, locations, onClose, onDelete
             </div>}
           </div>
 
-        </div>
-      )}
+      </div>
 
-      {subTab==="items" && <LootTab story={story} onUpdateStory={onUpdateStory} artifacts={artifacts||[]} chars={chars} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact} rarities={rarities}/>}
-      {subTab==="hooks" && <HooksTab story={story} onUpdateStory={onUpdateStory} hookStatuses={hookStatuses} onPinHook={onPinHook} pinnedHookIds={pinnedHookIds} chars={chars} factions={factions} locations={locations} artifacts={artifacts||[]}/>}
-      {subTab==="timeline" && (
-        <div style={{ padding:"16px 24px" }}>
-          <Timeline events={events} chars={chars}
-            onSaveEvent={saveEvent} onDelete={deleteEvent} onOpenChar={onOpenChar} onReorder={reorderEvent}
-            currentTimelineDate={currentTimelineDate}
-            highlightEventId={highlightEventId} onHighlightClear={onHighlightClear}/>
-        </div>
-      )}
+      {/* ── Items ── */}
+      <div style={{ borderTop:"2px solid #2a1f3d" }}>
+        {SectionHead("items", "🎒 Items", { count:(story.loot||[]).length, showEmpty:!(story.loot||[]).length })}
+        {isSectionOpen("items") && <LootTab story={story} onUpdateStory={onUpdateStory} artifacts={artifacts||[]} chars={chars} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact} rarities={rarities}/>}
+      </div>
+
+      {/* ── Hooks ── */}
+      <div style={{ borderTop:"2px solid #2a1f3d" }}>
+        {SectionHead("hooks", "🔮 Hooks", { count:(story.hooks||[]).length, showEmpty:!(story.hooks||[]).length })}
+        {isSectionOpen("hooks") && <HooksTab story={story} onUpdateStory={onUpdateStory} hookStatuses={hookStatuses} onPinHook={onPinHook} pinnedHookIds={pinnedHookIds} chars={chars} factions={factions} locations={locations} artifacts={artifacts||[]}/>}
+      </div>
+
+      {/* ── Timeline ── */}
+      <div style={{ borderTop:"2px solid #2a1f3d" }}>
+        {SectionHead("timeline", "⏳ Timeline", { count:events.length, showEmpty:!events.length })}
+        {isSectionOpen("timeline") && (
+          <div style={{ padding:"8px 24px 20px" }}>
+            <Timeline events={events} chars={chars}
+              onSaveEvent={saveEvent} onDelete={deleteEvent} onOpenChar={onOpenChar} onReorder={reorderEvent}
+              currentTimelineDate={currentTimelineDate}
+              highlightEventId={highlightEventId} onHighlightClear={onHighlightClear}/>
+          </div>
+        )}
+      </div>
       {playerPicker&&(
         <div onClick={()=>setPlayerPicker(false)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.78)", zIndex:300, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div onClick={e=>e.stopPropagation()} style={{ background:"#1a1228", border:"1px solid #7c5cbf", borderRadius:12, padding:24, width:360, maxHeight:"70vh", overflowY:"auto", boxShadow:"0 0 40px #7c5cbf44" }}>

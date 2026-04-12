@@ -504,6 +504,7 @@ export default function App() {
   }, []);
 
   const [loaded, setLoaded] = useState(false);
+  const [isDev, setIsDev] = useState(false);
   const [mapPicker, setMapPicker] = useState(null); // { location, maps: [{map, pin}] }
   const [confirm, setConfirm] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -642,6 +643,10 @@ export default function App() {
   }, []); // eslint-disable-line
 
   // ── Initial load ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    window.electronAPI?.isDev?.().then(v => setIsDev(!!v)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     (async () => {
       // Load campaign registry
@@ -882,31 +887,43 @@ export default function App() {
   }, [showToast]);
 
   // Stable modal openers — open in the panel showing the right section, else panel 0
-  function openCharModal(type) {
+  function openCharModal(type, panelIdx) {
     const newId = uid();
     pushHistory();
     setChars(prev => [...prev, {...defaultChar, type, id: newId, _isNew: true}]);
-    navToSection("characters", { selectedCharId: newId, charEditing: true });
+    if (panelIdx !== undefined) {
+      setPanels(prev => { const np=[...prev]; np[panelIdx]={...(np[panelIdx]||PANEL_DEFAULT), section:"characters", selectedCharId:newId, charEditing:true}; return np; });
+    } else {
+      navToSection("characters", { selectedCharId: newId, charEditing: true });
+    }
   }
   function cancelNewChar(id) {
     setChars(prev => prev.filter(c => c.id !== id));
     setPanels(prev => prev.map(p => p?.section === "characters" ? { ...p, selectedCharId: null, charEditing: false } : p));
   }
-  function openStoryModal() {
+  function openStoryModal(panelIdx) {
     const newId = uid();
     pushHistory();
     setStories(prev => [...prev, {...defaultStory, id: newId, _isNew: true}]);
-    navToSection("stories", { selectedStoryId: newId, storyEditing: true });
+    if (panelIdx !== undefined) {
+      setPanels(prev => { const np=[...prev]; np[panelIdx]={...(np[panelIdx]||PANEL_DEFAULT), section:"stories", selectedStoryId:newId, storyEditing:true}; return np; });
+    } else {
+      navToSection("stories", { selectedStoryId: newId, storyEditing: true });
+    }
   }
   function cancelNewStory(id) {
     setStories(prev => prev.filter(s => s.id !== id));
     setPanels(prev => prev.map(p => p?.section === "stories" ? { ...p, selectedStoryId: null, storyEditing: false } : p));
   }
-  function openFactionModal() {
+  function openFactionModal(panelIdx) {
     const newId = uid();
     pushHistory();
     setFactions(prev => [...prev, {...defaultFaction, id: newId, _isNew: true}]);
-    navToSection("factions", { selectedFactionId: newId, factionEditing: true });
+    if (panelIdx !== undefined) {
+      setPanels(prev => { const np=[...prev]; np[panelIdx]={...(np[panelIdx]||PANEL_DEFAULT), section:"factions", selectedFactionId:newId, factionEditing:true}; return np; });
+    } else {
+      navToSection("factions", { selectedFactionId: newId, factionEditing: true });
+    }
   }
   function cancelNewFaction(id) {
     setFactions(prev => prev.filter(f => f.id !== id));
@@ -1135,7 +1152,7 @@ export default function App() {
       selectedChar={pSelectedChar} selectedCharId={panel.selectedCharId}
       charSubTab={panel.charSubTab} mainCollapsed={panel.mainCollapsed} sideCollapsed={panel.sideCollapsed}
       updPg={upd}
-      onNewChar={openCharModal} onDeleteChar={deleteChar} onCancelNew={cancelNewChar}
+      onNewChar={(type) => openCharModal(type, panelIdx)} onDeleteChar={deleteChar} onCancelNew={cancelNewChar}
       onOpenStory={onOpenStory} onOpenFaction={onOpenFaction} onOpenChar={onOpenChar} onOpenArtifact={onOpenArtifact}
       onSaveChar={saveChar} onSaveFaction={saveFaction} onUpdateArtifacts={updateArtifacts}
       onPinCharHook={handlePinCharHook} pinnedCharHookIds={pinnedCharHookIds} rarities={rarities}/>;
@@ -1148,7 +1165,7 @@ export default function App() {
       mainStory={pMainStory} playerStories={pPlayerStories} otherStories={pOtherStories}
       currentTimelineDate={currentTimelineDate}
       updPg={upd}
-      onNewStory={openStoryModal} onDeleteStory={deleteStory} onCancelNew={cancelNewStory}
+      onNewStory={() => openStoryModal(panelIdx)} onDeleteStory={deleteStory} onCancelNew={cancelNewStory}
       onSetMain={setMainStory} onSetPlayerStory={setPlayerStory} onUpdateStory={updateStory}
       onOpenChar={onOpenChar} onOpenFaction={onOpenFaction} onOpenLocation={onOpenLocation}
       onOpenArtifact={onOpenArtifact} onUpdateArtifacts={updateArtifacts}
@@ -1161,7 +1178,7 @@ export default function App() {
       factionQuery={panel.factionQuery||""}
       selectedFaction={pSelectedFaction} selectedFactionId={panel.selectedFactionId}
       updPg={upd}
-      onNewFaction={openFactionModal} onCancelNew={cancelNewFaction}
+      onNewFaction={() => openFactionModal(panelIdx)} onCancelNew={cancelNewFaction}
       onSaveFaction={saveFaction} onDeleteFaction={deleteFaction} onOpenChar={onOpenChar} onSaveChar={saveChar}/>;
     if (section==="timeline") return <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}>
       <div style={{ padding:"28px 32px 12px", flexShrink:0 }}>
@@ -1228,6 +1245,13 @@ export default function App() {
             </div>
           ))}
         </nav>
+
+        {/* DEV badge */}
+        {isDev && (
+          <div style={{ width:"100%", padding:"4px 0", marginBottom:4, background:"#5a0a0a", border:"1px solid #a01a1a", borderRadius:0, textAlign:"center" }}>
+            <span style={{ fontSize:9, fontWeight:700, color:"#ff8080", letterSpacing:1, textTransform:"uppercase" }}>DEV</span>
+          </div>
+        )}
 
         {/* Bottom tools */}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, paddingTop:6, borderTop:"1px solid #2a1f3d", width:"100%" }}>

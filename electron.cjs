@@ -6,6 +6,12 @@ const fs = require("fs");
 // In production (packaged .exe/.dmg) app.isPackaged is true → load from dist
 const isDev = !app.isPackaged;
 
+if (isDev) {
+  app.setPath("userData", path.join(app.getPath("appData"), "WorldBuilder-dev"));
+}
+
+ipcMain.handle("is-dev", () => isDev);
+
 ipcMain.handle("copy-image-to-clipboard", (_event, dataUrl) => {
   try {
     const img = nativeImage.createFromDataURL(dataUrl);

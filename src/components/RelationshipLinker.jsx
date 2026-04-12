@@ -23,6 +23,9 @@ export default function RelationshipLinker({ relationships, chars, relationshipT
   const setType = (charId, type) =>
     onChange((relationships||[]).map(r => r.charId === charId ? { ...r, type } : r));
 
+  const setNote = (charId, note) =>
+    onChange((relationships||[]).map(r => r.charId === charId ? { ...r, note } : r));
+
   const byType = {};
   types.forEach(t => { byType[t.name||t] = []; });
   (relationships||[]).forEach(rel => {
@@ -68,20 +71,31 @@ export default function RelationshipLinker({ relationships, chars, relationshipT
                   draggable
                   onDragStart={e=>{ e.dataTransfer.effectAllowed="move"; setDragId(c.id); }}
                   onDragEnd={()=>{ setDragId(null); setDragOverType(null); }}
-                  style={{ display:"flex", alignItems:"center", gap:6, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"6px 8px", cursor:"grab", opacity: dragId === c.id ? 0.4 : 1, transition:"opacity .1s" }}>
-                  <Avatar src={c.image} name={c.name} size={26}/>
-                  <span
-                    onClick={e=>{ e.stopPropagation(); if(!onOpenChar) return; if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);} }}
-                    onAuxClick={e=>{ if(e.button===1&&onOpenChar){e.preventDefault();e.stopPropagation();onOpenChar(c,{newTab:true});} }}
-                    style={{ fontSize:12, color:onOpenChar?"#c8a96e":"#e8d5b7", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", cursor:onOpenChar?"pointer":"default" }}
-                    onMouseEnter={e=>{ if(onOpenChar) e.currentTarget.style.textDecoration="underline"; }}
-                    onMouseLeave={e=>{ e.currentTarget.style.textDecoration="none"; }}>
-                    {c.name}
-                  </span>
-                  <button onClick={()=>remove(c.id)}
-                    style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:14, padding:0, lineHeight:1, flexShrink:0 }}
-                    onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
-                    onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                  style={{ display:"flex", flexDirection:"column", gap:4, background:"#13101f", border:"1px solid #2a1f3d", borderRadius:6, padding:"6px 8px", opacity: dragId === c.id ? 0.4 : 1, transition:"opacity .1s" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, cursor:"grab" }}>
+                    <Avatar src={c.image} name={c.name} size={26}/>
+                    <span
+                      onClick={e=>{ e.stopPropagation(); if(!onOpenChar) return; if(e.ctrlKey||e.metaKey){e.preventDefault();onOpenChar(c,{newTab:true});}else{onOpenChar(c);} }}
+                      onAuxClick={e=>{ if(e.button===1&&onOpenChar){e.preventDefault();e.stopPropagation();onOpenChar(c,{newTab:true});} }}
+                      style={{ fontSize:12, color:onOpenChar?"#c8a96e":"#e8d5b7", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", cursor:onOpenChar?"pointer":"default" }}
+                      onMouseEnter={e=>{ if(onOpenChar) e.currentTarget.style.textDecoration="underline"; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.textDecoration="none"; }}>
+                      {c.name}
+                    </span>
+                    <button onClick={()=>remove(c.id)}
+                      style={{ background:"none", border:"none", color:"#5a4a7a", cursor:"pointer", fontSize:14, padding:0, lineHeight:1, flexShrink:0 }}
+                      onMouseEnter={e=>e.currentTarget.style.color="#c06060"}
+                      onMouseLeave={e=>e.currentTarget.style.color="#5a4a7a"}>×</button>
+                  </div>
+                  <input
+                    value={rel.note||""}
+                    onChange={e=>setNote(c.id, e.target.value)}
+                    onClick={e=>e.stopPropagation()}
+                    onMouseDown={e=>e.stopPropagation()}
+                    placeholder="Add note…"
+                    style={{ fontSize:11, background:"transparent", border:"none", borderBottom:"1px solid #1e1630", color:"#7c6a9a", outline:"none", padding:"2px 0", width:"100%", cursor:"text" }}
+                    onFocus={e=>{ e.currentTarget.style.borderBottomColor="#7c5cbf"; e.currentTarget.style.color="#b09080"; }}
+                    onBlur={e=>{ e.currentTarget.style.borderBottomColor="#1e1630"; e.currentTarget.style.color="#7c6a9a"; }}/>
                 </div>
               ))}
 
